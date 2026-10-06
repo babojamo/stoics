@@ -16,7 +16,6 @@ const managedLinux = readExecutionProfile() === "managed-linux";
 const applicationVariableNames = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-  "STOICS_MANAGER_USERNAME",
   "STOICS_MANAGER_PASSWORD",
   "STOICS_SESSION_SECRET",
 ] as const;

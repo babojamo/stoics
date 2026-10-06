@@ -1,4 +1,4 @@
-import { isAuthorized } from "../../../lib/auth-server";
+import { getSessionUser } from "../../../lib/auth-server";
 import { defaultState } from "../../../lib/default-state";
 import type { LootState } from "../../../lib/types";
 import { getRuntimeEnv } from "../../../lib/runtime-env";
@@ -19,7 +19,7 @@ function config() {
 }
 
 export async function GET(request: Request) {
-  if (!(await isAuthorized(request))) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await getSessionUser(request))) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const { url, key } = config();
   if (!url || !key) return Response.json({ state: defaultState, connected: false, reason: "Supabase is not configured." });
   const response = await fetch(`${url}/rest/v1/stoics_loot_state?id=eq.${rowId}&select=payload`, { headers: supabaseHeaders(), cache: "no-store" });
@@ -31,8 +31,12 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  if (!(await isAuthorized(request))) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const username = await getSessionUser(request);
+  if (!username) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const state = (await request.json()) as LootState;
+  state.lastUpdatedBy = username;
+  state.lastUpdatedAt = new Date().toISOString();
+  if (state.auditLog?.[0]) state.auditLog[0].username = username;
   const { url, key } = config();
   if (!url || !key) return Response.json({ error: "Supabase is not configured." }, { status: 503 });
   const response = await fetch(`${url}/rest/v1/stoics_loot_state`, {

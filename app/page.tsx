@@ -56,6 +56,7 @@ function Logo() {
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [currentUser, setCurrentUser] = useState("");
   const [credentials, setCredentials] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
@@ -84,17 +85,24 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/status").then((r) => r.json() as Promise<{ authenticated: boolean }>).then((data) => {
-      if (data.authenticated) load(); else setAuthenticated(false);
+    fetch("/api/auth/status").then((r) => r.json() as Promise<{ authenticated: boolean; username: string | null }>).then((data) => {
+      if (data.authenticated) { setCurrentUser(data.username ?? "Manager"); load(); } else setAuthenticated(false);
     }).catch(() => setAuthenticated(false));
   }, [load]);
 
-  const persist = async (next: LootState) => {
-    setState(next);
-    localStorage.setItem("stoics-loot-state", JSON.stringify(next));
+  const persist = async (next: LootState, action = "Updated loot data") => {
+    const now = new Date().toISOString();
+    const stamped: LootState = {
+      ...next,
+      auditLog: [{ id: makeId(), username: currentUser, action, createdAt: now }, ...(next.auditLog ?? [])].slice(0, 100),
+      lastUpdatedBy: currentUser,
+      lastUpdatedAt: now,
+    };
+    setState(stamped);
+    localStorage.setItem("stoics-loot-state", JSON.stringify(stamped));
     setSaving(true);
     try {
-      const response = await fetch("/api/state", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
+      const response = await fetch("/api/state", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(stamped) });
       if (response.ok) { setConnected(true); setFlash({ type: "good", text: "Saved to Supabase" }); }
       else { setConnected(false); setFlash({ type: "warn", text: "Saved on this device. Supabase needs the included setup SQL." }); }
     } catch {
@@ -111,7 +119,7 @@ export default function Home() {
     const response = await fetch("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(credentials) });
     const data = await response.json() as { error?: string };
     if (!response.ok) { setLoginError(data.error ?? "Unable to sign in."); setLoginBusy(false); return; }
-    await load(); setLoginBusy(false);
+    setCurrentUser(credentials.username.trim()); await load(); setLoginBusy(false);
   };
 
   if (authenticated === null) return <main className="splash"><LoaderCircle className="spin" /><span>Opening the ledger…</span></main>;
@@ -130,7 +138,7 @@ export default function Home() {
         <div className="sidebar-top"><Logo /><button className="icon-button close-nav" onClick={() => setMobileNav(false)}><X size={18} /></button></div>
         <nav>{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setMobileNav(false); }}>{item.icon}<span>{item.label}</span></button>)}</nav>
         <div className="sidebar-note"><Sparkles size={16} /><div><strong>Fair payout queue</strong><span>Oldest waiting member is shown first.</span></div></div>
-        <button className="signout" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); setAuthenticated(false); }}><LogOut size={17} /> Sign out</button>
+        <button className="signout" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); setCurrentUser(""); setAuthenticated(false); }}><LogOut size={17} /> Sign out</button>
       </aside>
       {mobileNav && <button className="scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
 
@@ -138,6 +146,7 @@ export default function Home() {
         <header className="topbar">
           <button className="icon-button menu-button" onClick={() => setMobileNav(true)}><Menu size={21} /></button>
           <div className="breadcrumb"><span>Guild operations</span><ChevronRight size={14} /><strong>{nav.find((item) => item.id === tab)?.label}</strong></div>
+          <div className="user-badge"><span>{currentUser.slice(0, 2).toUpperCase()}</span><div><small>Signed in as</small><strong>{currentUser}</strong></div></div>
           <div className={`sync ${connected ? "online" : "local"}`}><span />{saving ? "Saving…" : connected ? "Supabase synced" : "Device save"}</div>
           <button className="primary top-action" onClick={() => setShowRun(true)}><Plus size={17} /> New run</button>
         </header>
@@ -151,8 +160,8 @@ export default function Home() {
         </div>
       </section>
 
-      {showRun && <RunModal state={state} onClose={() => setShowRun(false)} onSave={(next) => { persist(next); setShowRun(false); setTab("runs"); }} />}
-      {showSale && <SaleModal state={state} inventory={inventory} onClose={() => setShowSale(false)} onSave={(next) => { persist(next); setShowSale(false); setTab("settlements"); }} />}
+      {showRun && <RunModal state={state} currentUser={currentUser} onClose={() => setShowRun(false)} onSave={(next) => { persist(next, "Added a dungeon run"); setShowRun(false); setTab("runs"); }} />}
+      {showSale && <SaleModal state={state} inventory={inventory} currentUser={currentUser} onClose={() => setShowSale(false)} onSave={(next) => { persist(next, "Recorded a batch sale and salaries"); setShowSale(false); setTab("settlements"); }} />}
     </main>
   );
 }
@@ -177,14 +186,15 @@ function Dashboard({ state, inventory, totalStock, totalSales, salaryPaid, onRun
       <section className="panel"><div className="panel-head"><div><span className="panel-kicker">PAYOUT ORDER</span><h2>Who receives next</h2></div><span className="queue-badge">FIFO</span></div><div className="queue-list">{state.payoutQueue.slice(0, 6).map((id, index) => { const member = state.members.find((m) => m.id === id); return member ? <div className="queue-row" key={id}><span className={index === 0 ? "queue-number first" : "queue-number"}>{index + 1}</span><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><strong>{member.name}</strong>{index === 0 && <em>Receives first</em>}</div> : null; })}</div></section>
     </div>
     <section className="panel recent"><div className="panel-head"><div><span className="panel-kicker">RECENT ACTIVITY</span><h2>Latest dungeon runs</h2></div></div><div className="table-wrap"><table><thead><tr><th>Dungeon</th><th>Date</th><th>Party</th><th>Loot types</th><th>Total units</th></tr></thead><tbody>{state.runs.slice(0, 5).map((run) => <tr key={run.id}><td><strong>{run.dungeon}</strong></td><td>{dateTime.format(new Date(run.createdAt))}</td><td>{run.memberIds.length} members</td><td>{run.loots.length}</td><td><b>{run.loots.reduce((sum, loot) => sum + loot.quantity, 0)}</b></td></tr>)}</tbody></table></div></section>
+    <section className="panel audit-panel"><div className="panel-head"><div><span className="panel-kicker">AUDIT TRAIL</span><h2>Who changed the ledger</h2></div>{state.lastUpdatedBy && <span className="last-editor">Last updated by <strong>{state.lastUpdatedBy}</strong></span>}</div><div className="audit-list">{(state.auditLog ?? []).length === 0 ? <p>No updates recorded yet.</p> : state.auditLog.slice(0, 6).map((entry) => <div className="audit-row" key={entry.id}><span className="avatar">{entry.username.slice(0, 2).toUpperCase()}</span><div><strong>{entry.username}</strong><span>{entry.action}</span></div><time>{dateTime.format(new Date(entry.createdAt))}</time></div>)}</div></section>
   </>;
 }
 
 function Metric({ icon, tone, label, value, note }: { icon: React.ReactNode; tone: string; label: string; value: string; note: string }) { return <article className="metric"><span className={`metric-icon ${tone}`}>{icon}</span><span>{label}</span><strong>{value}</strong><small>{note}</small></article>; }
 
-function Runs({ state, onChange, onRun }: { state: LootState; onChange: (next: LootState) => void; onRun: () => void }) {
-  const removeRun = (id: string) => onChange({ ...state, runs: state.runs.filter((run) => run.id !== id) });
-  return <><PageTitle eyebrow="RUN HISTORY" title="Dungeon runs" text="Review party rosters and edit the loot captured after every clear." action={<button className="primary" onClick={onRun}><Plus size={17} /> Add dungeon run</button>} /><div className="run-stack">{state.runs.map((run) => <article className="run-card" key={run.id}><div className="run-date"><strong>{new Date(run.createdAt).getDate()}</strong><span>{new Date(run.createdAt).toLocaleString("en", { month: "short" })}</span></div><div className="run-main"><div className="run-title"><div><h2>{run.dungeon}</h2><span>{dateTime.format(new Date(run.createdAt))}</span></div><button className="icon-button danger" aria-label="Delete run" onClick={() => removeRun(run.id)}><Trash2 size={16} /></button></div><div className="run-section"><label>Party</label><div className="chips">{run.memberIds.map((id) => <span className="member-chip" key={id}>{state.members.find((m) => m.id === id)?.name ?? "Unknown"}</span>)}</div></div><div className="run-section"><label>Loot</label><div className="loot-grid">{run.loots.map((loot) => <EditableLoot key={loot.id} loot={loot} onChange={(updated) => onChange({ ...state, runs: state.runs.map((candidate) => candidate.id === run.id ? { ...candidate, loots: candidate.loots.map((entry) => entry.id === loot.id ? updated : entry) } : candidate) })} />)}</div></div></div></article>)}</div></>;
+function Runs({ state, onChange, onRun }: { state: LootState; onChange: (next: LootState, action?: string) => void; onRun: () => void }) {
+  const removeRun = (id: string) => onChange({ ...state, runs: state.runs.filter((run) => run.id !== id) }, "Deleted a dungeon run");
+  return <><PageTitle eyebrow="RUN HISTORY" title="Dungeon runs" text="Review party rosters and edit the loot captured after every clear." action={<button className="primary" onClick={onRun}><Plus size={17} /> Add dungeon run</button>} /><div className="run-stack">{state.runs.map((run) => <article className="run-card" key={run.id}><div className="run-date"><strong>{new Date(run.createdAt).getDate()}</strong><span>{new Date(run.createdAt).toLocaleString("en", { month: "short" })}</span></div><div className="run-main"><div className="run-title"><div><h2>{run.dungeon}</h2><span>{dateTime.format(new Date(run.createdAt))} · Added by {run.createdBy ?? "Unknown"}</span></div><button className="icon-button danger" aria-label="Delete run" onClick={() => removeRun(run.id)}><Trash2 size={16} /></button></div><div className="run-section"><label>Party</label><div className="chips">{run.memberIds.map((id) => <span className="member-chip" key={id}>{state.members.find((m) => m.id === id)?.name ?? "Unknown"}</span>)}</div></div><div className="run-section"><label>Loot</label><div className="loot-grid">{run.loots.map((loot) => <EditableLoot key={loot.id} loot={loot} onChange={(updated) => onChange({ ...state, runs: state.runs.map((candidate) => candidate.id === run.id ? { ...candidate, loots: candidate.loots.map((entry) => entry.id === loot.id ? updated : entry) } : candidate) }, `Edited ${loot.name || "a loot item"}`)} />)}</div></div></div></article>)}</div></>;
 }
 
 function EditableLoot({ loot, onChange }: { loot: RunLoot; onChange: (loot: RunLoot) => void }) { return <div className="editable-loot"><Gem size={16} /><input value={loot.name} onChange={(e) => onChange({ ...loot, name: e.target.value })} /><input className="qty" type="number" min="0" value={loot.quantity} onChange={(e) => onChange({ ...loot, quantity: Number(e.target.value) })} /></div>; }
@@ -196,10 +206,10 @@ function Inventory({ inventory, onSale }: { inventory: ReturnType<typeof invento
 }
 
 function Settlements({ state, onSale }: { state: LootState; onSale: () => void }) {
-  return <><PageTitle eyebrow="TREASURY" title="Sales & salaries" text="Every batch sale and the members who received their share." action={<button className="primary" onClick={onSale}><Coins size={17} /> Record batch sale</button>} /><div className="sale-stack">{state.sales.length === 0 ? <div className="empty"><span><ReceiptText size={28} /></span><h2>No sales recorded yet</h2><p>Sell any accumulated loot to calculate the party salary.</p><button className="primary" onClick={onSale}>Record first sale</button></div> : state.sales.map((sale) => <article className="sale-card" key={sale.id}><span className="sale-icon"><Coins /></span><div className="sale-info"><span>{dateTime.format(new Date(sale.createdAt))}</span><h2>{sale.lootName}</h2><p>{sale.quantity.toLocaleString()} × {peso.format(sale.unitPrice)} each</p></div><div className="sale-total"><span>Total sale</span><strong>{peso.format(sale.total)}</strong></div><div className="salary"><span>{sale.recipientIds.length} recipients</span><strong>{peso.format(sale.salaryEach)} each</strong><div className="mini-avatars">{sale.recipientIds.slice(0, 6).map((id) => <i key={id}>{state.members.find((m) => m.id === id)?.name.slice(0, 1)}</i>)}</div></div></article>)}</div></>;
+  return <><PageTitle eyebrow="TREASURY" title="Sales & salaries" text="Every batch sale and the members who received their share." action={<button className="primary" onClick={onSale}><Coins size={17} /> Record batch sale</button>} /><div className="sale-stack">{state.sales.length === 0 ? <div className="empty"><span><ReceiptText size={28} /></span><h2>No sales recorded yet</h2><p>Sell any accumulated loot to calculate the party salary.</p><button className="primary" onClick={onSale}>Record first sale</button></div> : state.sales.map((sale) => <article className="sale-card" key={sale.id}><span className="sale-icon"><Coins /></span><div className="sale-info"><span>{dateTime.format(new Date(sale.createdAt))} · {sale.createdBy ?? "Unknown"}</span><h2>{sale.lootName}</h2><p>{sale.quantity.toLocaleString()} × {peso.format(sale.unitPrice)} each</p></div><div className="sale-total"><span>Total sale</span><strong>{peso.format(sale.total)}</strong></div><div className="salary"><span>{sale.recipientIds.length} recipients</span><strong>{peso.format(sale.salaryEach)} each</strong><div className="mini-avatars">{sale.recipientIds.slice(0, 6).map((id) => <i key={id}>{state.members.find((m) => m.id === id)?.name.slice(0, 1)}</i>)}</div></div></article>)}</div></>;
 }
 
-function RunModal({ state, onClose, onSave }: { state: LootState; onClose: () => void; onSave: (state: LootState) => void }) {
+function RunModal({ state, currentUser, onClose, onSave }: { state: LootState; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {
   const [dungeon, setDungeon] = useState("Dekane Mine");
   const [members, setMembers] = useState<Member[]>(state.members.map((m) => ({ ...m })));
   const [selected, setSelected] = useState<string[]>(state.members.filter((m) => m.active).map((m) => m.id));
@@ -237,7 +247,7 @@ function RunModal({ state, onClose, onSave }: { state: LootState; onClose: () =>
   const save = () => {
     const cleanLoots = loots.filter((loot) => loot.name.trim() && loot.quantity > 0);
     if (!dungeon.trim() || !selected.length || !cleanLoots.length) return;
-    const run: DungeonRun = { id: makeId(), dungeon: dungeon.trim(), createdAt: new Date().toISOString(), memberIds: selected, loots: cleanLoots };
+    const run: DungeonRun = { id: makeId(), dungeon: dungeon.trim(), createdAt: new Date().toISOString(), memberIds: selected, loots: cleanLoots, createdBy: currentUser };
     const newIds = members.filter((m) => !state.members.some((old) => old.id === m.id)).map((m) => m.id);
     onSave({ ...state, members, runs: [run, ...state.runs], payoutQueue: [...state.payoutQueue, ...newIds.filter((id) => !state.payoutQueue.includes(id))] });
   };
@@ -245,7 +255,7 @@ function RunModal({ state, onClose, onSave }: { state: LootState; onClose: () =>
   return <Modal title="Log a dungeon run" subtitle="Import the party, confirm the roster, then record every drop." onClose={onClose}><div className="modal-scroll"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Dungeon & party screenshot</strong><small>OCR will suggest member names for you.</small></div></div><label className="field">Dungeon name<input value={dungeon} onChange={(e) => setDungeon(e.target.value)} /></label><button className={`dropzone ${reading ? "reading" : ""}`} onClick={() => fileRef.current?.click()}><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0])} />{reading ? <LoaderCircle className="spin" /> : <ImagePlus />}<strong>{ocrNote}</strong><span>PNG or JPG · You can also press Ctrl+V</span></button></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Confirm party members</strong><small>Edit any name the screenshot reader got wrong.</small></div></div><div className="member-editor">{members.map((member) => <div key={member.id} className={selected.includes(member.id) ? "member-edit selected" : "member-edit"}><button onClick={() => setSelected((current) => current.includes(member.id) ? current.filter((id) => id !== member.id) : [...current, member.id])}>{selected.includes(member.id) && <Check size={13} />}</button><input value={member.name} onChange={(e) => setMembers((current) => current.map((m) => m.id === member.id ? { ...m, name: e.target.value } : m))} /><button className="remove" onClick={() => { setMembers((current) => current.filter((m) => m.id !== member.id)); setSelected((current) => current.filter((id) => id !== member.id)); }}><X size={14} /></button></div>)}</div><button className="text-button add-member" onClick={addMember}><Plus size={15} /> Add member manually</button></section><section className="form-section"><div className="section-label"><span>3</span><div><strong>Add loot</strong><small>Suggestions learn from previously saved loot names.</small></div></div><datalist id="loot-suggestions">{suggestions.map((name) => <option value={name} key={name} />)}</datalist><div className="loot-editor"><div className="loot-head"><span>Loot name</span><span>Quantity</span></div>{loots.map((loot) => <div className="loot-edit-row" key={loot.id}><input list="loot-suggestions" value={loot.name} placeholder="e.g. Sunstone" onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, name: e.target.value } : item))} /><input type="number" min="1" value={loot.quantity} onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, quantity: Number(e.target.value) } : item))} /><button className="icon-button" onClick={() => setLoots((current) => current.filter((item) => item.id !== loot.id))}><Trash2 size={15} /></button></div>)}</div><button className="text-button" onClick={() => setLoots((current) => [...current, { id: makeId(), name: "", quantity: 1 }])}><Plus size={15} /> Add another loot</button></section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" onClick={save}><Check size={16} /> Save dungeon run</button></div></Modal>;
 }
 
-function SaleModal({ state, inventory, onClose, onSave }: { state: LootState; inventory: ReturnType<typeof inventoryFor>; onClose: () => void; onSave: (state: LootState) => void }) {
+function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: LootState; inventory: ReturnType<typeof inventoryFor>; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {
   const available = inventory.filter((item) => item.available > 0);
   const [lootName, setLootName] = useState(available[0]?.name ?? "");
   const stock = available.find((item) => item.name === lootName);
@@ -263,7 +273,7 @@ function SaleModal({ state, inventory, onClose, onSave }: { state: LootState; in
   const salary = recipients.length ? Math.floor(total / recipients.length) : 0;
   const save = () => {
     if (!lootName || quantity < 1 || quantity > (stock?.available ?? 0) || unitPrice <= 0 || !recipients.length) return;
-    const sale: Sale = { id: makeId(), lootName, quantity, unitPrice, total, recipientIds: recipients, salaryEach: salary, createdAt: new Date().toISOString() };
+    const sale: Sale = { id: makeId(), lootName, quantity, unitPrice, total, recipientIds: recipients, salaryEach: salary, createdAt: new Date().toISOString(), createdBy: currentUser };
     const unpaid = state.payoutQueue.filter((id) => !recipients.includes(id));
     onSave({ ...state, sales: [sale, ...state.sales], payoutQueue: [...unpaid, ...recipients] });
   };

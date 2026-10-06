@@ -16,6 +16,7 @@ export type DungeonRun = {
   createdAt: string;
   memberIds: string[];
   loots: RunLoot[];
+  createdBy?: string;
 };
 
 export type Sale = {
@@ -27,6 +28,14 @@ export type Sale = {
   recipientIds: string[];
   salaryEach: number;
   createdAt: string;
+  createdBy?: string;
+};
+
+export type AuditEntry = {
+  id: string;
+  username: string;
+  action: string;
+  createdAt: string;
 };
 
 export type LootState = {
@@ -34,5 +43,8 @@ export type LootState = {
   runs: DungeonRun[];
   sales: Sale[];
   payoutQueue: string[];
+  auditLog: AuditEntry[];
+  lastUpdatedBy?: string;
+  lastUpdatedAt?: string;
 };
 

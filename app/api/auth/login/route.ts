@@ -4,11 +4,14 @@ import { getRuntimeEnv } from "../../../../lib/runtime-env";
 export async function POST(request: Request) {
   const runtime = getRuntimeEnv();
   const body = (await request.json().catch(() => ({}))) as { username?: string; password?: string };
-  const username = runtime.STOICS_MANAGER_USERNAME ?? "stoics-admin";
+  const username = body.username?.trim() ?? "";
   const password = runtime.STOICS_MANAGER_PASSWORD;
   if (!password) return Response.json({ error: "Manager password is not configured." }, { status: 503 });
-  if (body.username !== username || body.password !== password) {
-    return Response.json({ error: "Username or password is incorrect." }, { status: 401 });
+  if (username.length < 2 || username.length > 32) {
+    return Response.json({ error: "Enter a username between 2 and 32 characters." }, { status: 400 });
+  }
+  if (body.password !== password) {
+    return Response.json({ error: "Password is incorrect." }, { status: 401 });
   }
   const token = await createSessionToken(username);
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";

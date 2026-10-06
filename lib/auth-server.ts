@@ -11,15 +11,23 @@ export async function createSessionToken(username: string) {
   const secret = runtime.STOICS_SESSION_SECRET ?? runtime.STOICS_MANAGER_PASSWORD ?? "";
   const day = new Date().toISOString().slice(0, 10);
   const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  return toHex(await crypto.subtle.sign("HMAC", key, encoder.encode(`${username}:${day}`)));
+  const safeUsername = encodeURIComponent(username);
+  const signature = toHex(await crypto.subtle.sign("HMAC", key, encoder.encode(`${safeUsername}:${day}`)));
+  return `${safeUsername}.${signature}`;
 }
 
-export async function isAuthorized(request: Request) {
+export async function getSessionUser(request: Request) {
   const runtime = getRuntimeEnv();
   const cookie = request.headers.get("cookie") ?? "";
   const session = cookie.match(/(?:^|;\s*)stoics_session=([^;]+)/)?.[1];
-  const username = runtime.STOICS_MANAGER_USERNAME ?? "stoics-admin";
-  if (!session || !runtime.STOICS_MANAGER_PASSWORD) return false;
-  return session === (await createSessionToken(username));
+  if (!session || !runtime.STOICS_MANAGER_PASSWORD) return null;
+  const separator = session.lastIndexOf(".");
+  if (separator < 1) return null;
+  const username = decodeURIComponent(session.slice(0, separator));
+  return session === (await createSessionToken(username)) ? username : null;
+}
+
+export async function isAuthorized(request: Request) {
+  return Boolean(await getSessionUser(request));
 }
 

@@ -22,9 +22,11 @@ export const defaultState: LootState = {
         { id: "loot-seed-2", name: "Moonstone", quantity: 38 },
         { id: "loot-seed-3", name: "Lightning Card (4%)", quantity: 2 },
       ],
+      createdBy: "System",
     },
   ],
   sales: [],
   payoutQueue: ["m-aeris", "m-kaizen", "m-nyx", "m-riven", "m-seraph", "m-volt", "m-lumi", "m-orion"],
+  auditLog: [],
 };
 

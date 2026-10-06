@@ -27,6 +27,7 @@ export type Sale = {
   total: number;
   recipientIds: string[];
   salaryEach: number;
+  recipientAmounts?: Record<string, number>;
   createdAt: string;
   createdBy?: string;
 };

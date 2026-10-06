@@ -22,7 +22,8 @@ create or replace function public.get_stoics_loot_state() returns jsonb language
     ) order by r.sort_order) from public.dungeon_runs r), '[]'::jsonb),
     'sales', coalesce((select jsonb_agg(jsonb_build_object(
       'id',s.id,'lootName',li.name,'quantity',s.quantity,'unitPrice',s.unit_price,'total',s.total,'salaryEach',s.salary_each,'createdAt',s.created_at,'createdBy',s.created_by,
-      'recipientIds',coalesce((select jsonb_agg(sr.member_id order by sr.queue_position) from public.sale_recipients sr where sr.sale_id=s.id),'[]'::jsonb)
+      'recipientIds',coalesce((select jsonb_agg(sr.member_id order by sr.queue_position) from public.sale_recipients sr where sr.sale_id=s.id),'[]'::jsonb),
+      'recipientAmounts',coalesce((select jsonb_object_agg(sr.member_id,sr.salary_amount) from public.sale_recipients sr where sr.sale_id=s.id),'{}'::jsonb)
     ) order by s.sort_order) from public.sales s join public.loot_items li on li.id=s.loot_item_id), '[]'::jsonb),
     'payoutQueue', coalesce((select jsonb_agg(pq.member_id order by pq.queue_position) from public.payout_queue pq),'[]'::jsonb),
     'auditLog', coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'username',a.username,'action',a.action,'createdAt',a.created_at) order by a.sort_order) from public.audit_log a),'[]'::jsonb),
@@ -68,7 +69,8 @@ begin
   from jsonb_array_elements(coalesce(p_state->'sales','[]'::jsonb)) with ordinality as s(value,ordinality)
   join public.loot_items li on lower(trim(li.name))=lower(trim(s.value->>'lootName'));
   insert into public.sale_recipients (sale_id,member_id,queue_position,salary_amount)
-  select s.value->>'id',recipient.value,recipient.ordinality::integer,(s.value->>'salaryEach')::numeric
+  select s.value->>'id',recipient.value,recipient.ordinality::integer,
+    coalesce((s.value->'recipientAmounts'->>recipient.value)::numeric,(s.value->>'salaryEach')::numeric)
   from jsonb_array_elements(coalesce(p_state->'sales','[]'::jsonb)) s(value)
   cross join lateral jsonb_array_elements_text(coalesce(s.value->'recipientIds','[]'::jsonb)) with ordinality as recipient(value,ordinality)
   where exists (select 1 from public.members m where m.id=recipient.value);

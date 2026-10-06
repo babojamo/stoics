@@ -29,7 +29,7 @@ import type { DungeonRun, LootState, Member, RunLoot, Sale } from "../lib/types"
 type Tab = "dashboard" | "runs" | "inventory" | "settlements";
 type Flash = { type: "good" | "warn"; text: string } | null;
 
-const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 });
+const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const dateTime = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 const makeId = () => crypto.randomUUID();
@@ -51,13 +51,13 @@ function inventoryFor(state: LootState) {
   return [...map.values()].map((row) => ({ ...row, available: row.collected - row.sold })).sort((a, b) => b.available - a.available);
 }
 
-function eligibleMembersForSale(state: LootState, lootName: string, quantity: number) {
+function contributingLotsForSale(state: LootState, lootName: string, quantity: number) {
   const key = lootName.trim().toLowerCase();
   let previouslySold = state.sales
     .filter((sale) => sale.lootName.trim().toLowerCase() === key)
     .reduce((sum, sale) => sum + sale.quantity, 0);
   let requested = Math.max(0, quantity);
-  const contributingMembers = new Set<string>();
+  const contributions: Array<{ run: DungeonRun; quantity: number }> = [];
   const lots = [...state.runs]
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .flatMap((run) => run.loots
@@ -69,9 +69,16 @@ function eligibleMembersForSale(state: LootState, lootName: string, quantity: nu
     previouslySold -= consumed;
     const available = lot.quantity - consumed;
     if (available <= 0 || requested <= 0) continue;
-    lot.run.memberIds.forEach((id) => contributingMembers.add(id));
-    requested -= Math.min(requested, available);
+    const soldFromLot = Math.min(requested, available);
+    contributions.push({ run: lot.run, quantity: soldFromLot });
+    requested -= soldFromLot;
   }
+
+  return contributions;
+}
+
+function eligibleMembersForSale(state: LootState, lootName: string, quantity: number) {
+  const contributingMembers = new Set(contributingLotsForSale(state, lootName, quantity).flatMap((lot) => lot.run.memberIds));
 
   const activeEligible = state.members
     .filter((member) => member.active && contributingMembers.has(member.id))
@@ -80,6 +87,33 @@ function eligibleMembersForSale(state: LootState, lootName: string, quantity: nu
     ...state.payoutQueue.filter((id) => activeEligible.includes(id)),
     ...activeEligible.filter((id) => !state.payoutQueue.includes(id)),
   ];
+}
+
+function salaryBreakdownForSale(state: LootState, lootName: string, quantity: number, unitPrice: number, recipientIds: string[]) {
+  const selected = new Set(recipientIds);
+  const amounts: Record<string, number> = {};
+  const partyGroups = new Map<string, { party: string[]; totalCents: number }>();
+  for (const contribution of contributingLotsForSale(state, lootName, quantity)) {
+    const party = [
+      ...state.payoutQueue.filter((id) => contribution.run.memberIds.includes(id) && selected.has(id)),
+      ...contribution.run.memberIds.filter((id) => selected.has(id) && !state.payoutQueue.includes(id)),
+    ];
+    if (!party.length) continue;
+    const partyKey = [...party].sort().join("|");
+    const group = partyGroups.get(partyKey) ?? { party, totalCents: 0 };
+    group.totalCents += Math.round(contribution.quantity * unitPrice * 100);
+    partyGroups.set(partyKey, group);
+  }
+  for (const group of partyGroups.values()) {
+    const baseCents = Math.floor(group.totalCents / group.party.length);
+    const remainder = group.totalCents - baseCents * group.party.length;
+    group.party.forEach((id, index) => { amounts[id] = (amounts[id] ?? 0) + (baseCents + (index < remainder ? 1 : 0)) / 100; });
+  }
+  return amounts;
+}
+
+function recordedPayouts(sale: Sale) {
+  return sale.recipientIds.map((id) => ({ id, amount: sale.recipientAmounts?.[id] ?? sale.salaryEach }));
 }
 
 function memberNameKey(name: string) {
@@ -175,7 +209,7 @@ export default function Home() {
   const inventory = useMemo(() => inventoryFor(state), [state]);
   const totalStock = inventory.reduce((sum, item) => sum + item.available, 0);
   const totalSales = state.sales.reduce((sum, sale) => sum + sale.total, 0);
-  const salaryPaid = state.sales.reduce((sum, sale) => sum + sale.salaryEach * sale.recipientIds.length, 0);
+  const salaryPaid = state.sales.reduce((sum, sale) => sum + recordedPayouts(sale).reduce((saleSum, payout) => saleSum + payout.amount, 0), 0);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/state", { cache: "no-store", credentials: "same-origin" });
@@ -325,7 +359,7 @@ function Inventory({ inventory, onSale }: { inventory: ReturnType<typeof invento
 }
 
 function Settlements({ state, onSale }: { state: LootState; onSale: () => void }) {
-  return <><PageTitle eyebrow="TREASURY" title="Sales & salaries" text="Every batch sale and the members who received their share." action={<button className="primary" onClick={onSale}><Coins size={17} /> Record batch sale</button>} /><div className="sale-stack">{state.sales.length === 0 ? <div className="empty"><span><ReceiptText size={28} /></span><h2>No sales recorded yet</h2><p>Sell any accumulated loot to calculate the party salary.</p><button className="primary" onClick={onSale}>Record first sale</button></div> : state.sales.map((sale) => <article className="sale-card" key={sale.id}><span className="sale-icon"><Coins /></span><div className="sale-info"><span>{dateTime.format(new Date(sale.createdAt))} · {sale.createdBy ?? "Unknown"}</span><h2>{sale.lootName}</h2><p>{sale.quantity.toLocaleString()} × {peso.format(sale.unitPrice)} each</p></div><div className="sale-total"><span>Total sale</span><strong>{peso.format(sale.total)}</strong></div><div className="salary"><span>{sale.recipientIds.length} recipients</span><strong>{peso.format(sale.salaryEach)} each</strong><div className="mini-avatars">{sale.recipientIds.slice(0, 6).map((id) => <i key={id}>{state.members.find((m) => m.id === id)?.name.slice(0, 1)}</i>)}</div></div></article>)}</div></>;
+  return <><PageTitle eyebrow="TREASURY" title="Sales & salaries" text="Every batch sale and the members who received their share." action={<button className="primary" onClick={onSale}><Coins size={17} /> Record batch sale</button>} /><div className="sale-stack">{state.sales.length === 0 ? <div className="empty"><span><ReceiptText size={28} /></span><h2>No sales recorded yet</h2><p>Sell any accumulated loot to calculate the party salary.</p><button className="primary" onClick={onSale}>Record first sale</button></div> : state.sales.map((sale) => { const payouts = recordedPayouts(sale); return <article className="sale-card" key={sale.id}><span className="sale-icon"><Coins /></span><div className="sale-info"><span>{dateTime.format(new Date(sale.createdAt))} · {sale.createdBy ?? "Unknown"}</span><h2>{sale.lootName}</h2><p>{sale.quantity.toLocaleString()} × {peso.format(sale.unitPrice)} each</p></div><div className="sale-total"><span>Total sale</span><strong>{peso.format(sale.total)}</strong></div><div className="salary"><span>{sale.recipientIds.length} recipients</span><strong>Party-based shares</strong><div className="mini-avatars">{sale.recipientIds.slice(0, 6).map((id) => <i key={id}>{state.members.find((m) => m.id === id)?.name.slice(0, 1)}</i>)}</div></div><div className="sale-payout-list">{payouts.map((payout) => <span key={payout.id}><b>{state.members.find((member) => member.id === payout.id)?.name ?? "Unknown"}</b><em>{peso.format(payout.amount)}</em></span>)}</div></article>; })}</div></>;
 }
 
 function RunModal({ state, run, currentUser, onClose, onSave }: { state: LootState; run?: DungeonRun; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {
@@ -398,23 +432,36 @@ function RunModal({ state, run, currentUser, onClose, onSave }: { state: LootSta
 
 function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: LootState; inventory: ReturnType<typeof inventoryFor>; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {
   const available = inventory.filter((item) => item.available > 0);
-  const [lootName, setLootName] = useState(available[0]?.name ?? "");
+  const initialLootName = available[0]?.name ?? "";
+  const initialQuantity = available[0]?.available ?? 1;
+  const [lootName, setLootName] = useState(initialLootName);
   const stock = available.find((item) => item.name === lootName);
-  const [quantity, setQuantity] = useState(stock?.available ?? 1);
+  const [quantity, setQuantity] = useState(initialQuantity);
   const [unitPrice, setUnitPrice] = useState(0);
   const eligibleIds = useMemo(() => eligibleMembersForSale(state, lootName, quantity), [state, lootName, quantity]);
-  const [recipients, setRecipients] = useState<string[]>([]);
-  useEffect(() => { setRecipients(eligibleIds); }, [eligibleIds]);
-  useEffect(() => { setQuantity(stock?.available ?? 1); }, [lootName, stock?.available]);
+  const [recipients, setRecipients] = useState<string[]>(() => eligibleMembersForSale(state, initialLootName, initialQuantity));
+  const selectLoot = (name: string) => {
+    const nextQuantity = available.find((item) => item.name === name)?.available ?? 1;
+    setLootName(name);
+    setQuantity(nextQuantity);
+    setRecipients(eligibleMembersForSale(state, name, nextQuantity));
+  };
+  const selectQuantity = (nextQuantity: number) => {
+    setQuantity(nextQuantity);
+    setRecipients(eligibleMembersForSale(state, lootName, nextQuantity));
+  };
   const total = quantity * unitPrice;
-  const salary = recipients.length ? Math.floor(total / recipients.length) : 0;
+  const recipientAmounts = useMemo(() => salaryBreakdownForSale(state, lootName, quantity, unitPrice, recipients), [state, lootName, quantity, unitPrice, recipients]);
+  const allocatedTotal = Object.values(recipientAmounts).reduce((sum, amount) => sum + amount, 0);
+  const allocationComplete = Math.round(allocatedTotal * 100) === Math.round(total * 100);
   const save = () => {
-    if (!lootName || quantity < 1 || quantity > (stock?.available ?? 0) || unitPrice <= 0 || !recipients.length) return;
-    const sale: Sale = { id: makeId(), lootName, quantity, unitPrice, total, recipientIds: recipients, salaryEach: salary, createdAt: new Date().toISOString(), createdBy: currentUser };
+    if (!lootName || quantity < 1 || quantity > (stock?.available ?? 0) || unitPrice <= 0 || !recipients.length || !allocationComplete) return;
+    const salaryEach = recipients.length ? Math.round((allocatedTotal / recipients.length) * 100) / 100 : 0;
+    const sale: Sale = { id: makeId(), lootName, quantity, unitPrice, total, recipientIds: recipients, salaryEach, recipientAmounts, createdAt: new Date().toISOString(), createdBy: currentUser };
     const unpaid = state.payoutQueue.filter((id) => !recipients.includes(id));
     onSave({ ...state, sales: [sale, ...state.sales], payoutQueue: [...unpaid, ...recipients] });
   };
-  return <Modal title="Record a batch sale" subtitle="Sell accumulated stock and split the proceeds fairly." onClose={onClose}><div className="modal-scroll sale-modal"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Sale details</strong><small>Choose any accumulated loot in stock.</small></div></div><div className="two-fields"><label className="field">Loot<select value={lootName} onChange={(e) => setLootName(e.target.value)}>{available.map((item) => <option key={item.name}>{item.name}</option>)}</select><small>{stock?.available.toLocaleString() ?? 0} available</small></label><label className="field">Quantity sold<input type="number" min="1" max={stock?.available} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} /></label></div><label className="field">Price per item (PHP)<input type="number" min="0" value={unitPrice || ""} placeholder="0" onChange={(e) => setUnitPrice(Number(e.target.value))} /></label></section><section className="sale-summary"><div><span>Gross sale</span><strong>{peso.format(total)}</strong></div><div><span>Recipients</span><strong>{recipients.length}</strong></div><div className="highlight"><span>Salary each</span><strong>{peso.format(salary)}</strong></div></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Select salary recipients</strong><small>Members are ordered by the fair payout queue. First in line appears first.</small></div></div><div className="recipient-list">{eligibleIds.map((id, index) => { const member = state.members.find((m) => m.id === id)!; return <label key={id} className={recipients.includes(id) ? "recipient selected" : "recipient"}><input type="checkbox" checked={recipients.includes(id)} onChange={() => setRecipients((current) => current.includes(id) ? current.filter((x) => x !== id) : [...current, id])} /><span className={index === 0 ? "queue-number first" : "queue-number"}>{index + 1}</span><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><strong>{member.name}</strong>{index === 0 && <em>First to receive</em>}<b>{recipients.includes(id) ? peso.format(salary) : "Skipped"}</b></label>; })}</div></section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" onClick={save}><Coins size={16} /> Save sale & salaries</button></div></Modal>;
+  return <Modal title="Record a batch sale" subtitle="Each sold loot lot is divided among the party that earned it." onClose={onClose}><div className="modal-scroll sale-modal"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Sale details</strong><small>Choose any accumulated loot in stock.</small></div></div><div className="two-fields"><label className="field">Loot<select value={lootName} onChange={(e) => selectLoot(e.target.value)}>{available.map((item) => <option key={item.name}>{item.name}</option>)}</select><small>{stock?.available.toLocaleString() ?? 0} available</small></label><label className="field">Quantity sold<input type="number" min="1" max={stock?.available} value={quantity} onChange={(e) => selectQuantity(Number(e.target.value))} /></label></div><label className="field">Price per item (PHP)<input type="number" min="0" value={unitPrice || ""} placeholder="0" onChange={(e) => setUnitPrice(Number(e.target.value))} /></label></section><section className="sale-summary"><div><span>Gross sale</span><strong>{peso.format(total)}</strong></div><div><span>Recipients</span><strong>{recipients.length}</strong></div><div className="highlight"><span>Allocated salaries</span><strong>{peso.format(allocatedTotal)}</strong></div></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Party salary allocation</strong><small>Each run’s sold quantity is split only among that run’s selected party members.</small></div></div><div className="recipient-list">{eligibleIds.map((id, index) => { const member = state.members.find((m) => m.id === id)!; return <label key={id} className={recipients.includes(id) ? "recipient selected" : "recipient"}><input type="checkbox" checked={recipients.includes(id)} onChange={() => setRecipients((current) => current.includes(id) ? current.filter((x) => x !== id) : [...current, id])} /><span className={index === 0 ? "queue-number first" : "queue-number"}>{index + 1}</span><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><strong>{member.name}</strong>{index === 0 && <em>First to receive</em>}<b>{recipients.includes(id) ? peso.format(recipientAmounts[id] ?? 0) : "Skipped"}</b></label>; })}</div>{!allocationComplete && total > 0 && <div className="allocation-warning">Select at least one member from every contributing party before saving.</div>}</section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" disabled={!allocationComplete || unitPrice <= 0 || quantity < 1 || quantity > (stock?.available ?? 0)} onClick={save}><Coins size={16} /> Save sale & salaries</button></div></Modal>;
 }
 
 function ConfirmModal({ title, text, onCancel, onConfirm }: { title: string; text: string; onCancel: () => void; onConfirm: () => void }) {

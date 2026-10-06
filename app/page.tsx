@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   Coins,
+  Copy,
   Gem,
   ImagePlus,
   LayoutDashboard,
@@ -30,6 +31,7 @@ type Tab = "dashboard" | "runs" | "inventory" | "settlements";
 type Flash = { type: "good" | "warn"; text: string } | null;
 
 const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const plainAmount = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const dateTime = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 const makeId = () => crypto.randomUUID();
@@ -454,6 +456,8 @@ function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: 
   const [unitPrice, setUnitPrice] = useState(0);
   const eligibleIds = useMemo(() => eligibleMembersForSale(state, lootName, quantity), [state, lootName, quantity]);
   const [recipients, setRecipients] = useState<string[]>(() => eligibleMembersForSale(state, initialLootName, initialQuantity));
+  const [mailRecipientId, setMailRecipientId] = useState(recipients[0] ?? "");
+  const [copiedKey, setCopiedKey] = useState("");
   const selectLoot = (name: string) => {
     const nextQuantity = available.find((item) => item.name === name)?.available ?? 1;
     setLootName(name);
@@ -468,6 +472,20 @@ function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: 
   const recipientAmounts = useMemo(() => salaryBreakdownForSale(state, lootName, quantity, unitPrice, recipients), [state, lootName, quantity, unitPrice, recipients]);
   const allocatedTotal = Object.values(recipientAmounts).reduce((sum, amount) => sum + amount, 0);
   const allocationComplete = Math.round(allocatedTotal * 100) === Math.round(total * 100);
+  const selectedMailRecipientId = recipients.includes(mailRecipientId) ? mailRecipientId : recipients[0] ?? "";
+  const mailLootName = quantity === 1 || /s$/i.test(lootName) ? lootName : `${lootName}s`;
+  const mailDate = new Intl.DateTimeFormat("en-US", { month: "numeric", day: "numeric", year: "2-digit" }).format(new Date());
+  const mailHeader = `SOLD ${quantity} ${mailLootName} ${mailDate}`;
+  const mailContent = `Sold ${quantity} ${mailLootName} | ${plainAmount.format(recipientAmounts[selectedMailRecipientId] ?? 0)} Each`;
+  const copyText = async (key: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey((current) => current === key ? "" : current), 1600);
+    } catch {
+      setCopiedKey("");
+    }
+  };
   const save = () => {
     if (!lootName || quantity < 1 || quantity > (stock?.available ?? 0) || unitPrice <= 0 || !recipients.length || !allocationComplete) return;
     const salaryEach = recipients.length ? Math.round((allocatedTotal / recipients.length) * 100) / 100 : 0;
@@ -475,7 +493,7 @@ function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: 
     const unpaid = state.payoutQueue.filter((id) => !recipients.includes(id));
     onSave({ ...state, sales: [sale, ...state.sales], payoutQueue: [...unpaid, ...recipients] });
   };
-  return <Modal title="Record a batch sale" subtitle="Each sold loot lot is divided among the party that earned it." onClose={onClose}><div className="modal-scroll sale-modal"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Sale details</strong><small>Choose any accumulated loot in stock.</small></div></div><div className="two-fields"><label className="field">Loot<select value={lootName} onChange={(e) => selectLoot(e.target.value)}>{available.map((item) => <option key={item.name}>{item.name}</option>)}</select><small>{stock?.available.toLocaleString() ?? 0} available</small></label><label className="field">Quantity sold<input type="number" min="1" max={stock?.available} value={quantity} onChange={(e) => selectQuantity(Number(e.target.value))} /></label></div><label className="field">Price per item (PHP)<input type="number" min="0" value={unitPrice || ""} placeholder="0" onChange={(e) => setUnitPrice(Number(e.target.value))} /></label></section><section className="sale-summary"><div><span>Gross sale</span><strong>{peso.format(total)}</strong></div><div><span>Recipients</span><strong>{recipients.length}</strong></div><div className="highlight"><span>Allocated salaries</span><strong>{peso.format(allocatedTotal)}</strong></div></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Party salary allocation</strong><small>Each run’s sold quantity is split only among that run’s selected party members.</small></div></div><div className="recipient-list">{eligibleIds.map((id, index) => { const member = state.members.find((m) => m.id === id)!; return <label key={id} className={recipients.includes(id) ? "recipient selected" : "recipient"}><input type="checkbox" checked={recipients.includes(id)} onChange={() => setRecipients((current) => current.includes(id) ? current.filter((x) => x !== id) : [...current, id])} /><span className={index === 0 ? "queue-number first" : "queue-number"}>{index + 1}</span><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><strong>{member.name}</strong>{index === 0 && <em>First to receive</em>}<b>{recipients.includes(id) ? peso.format(recipientAmounts[id] ?? 0) : "Skipped"}</b></label>; })}</div>{!allocationComplete && total > 0 && <div className="allocation-warning">Select at least one member from every contributing party before saving.</div>}</section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" disabled={!allocationComplete || unitPrice <= 0 || quantity < 1 || quantity > (stock?.available ?? 0)} onClick={save}><Coins size={16} /> Save sale & salaries</button></div></Modal>;
+  return <Modal title="Record a batch sale" subtitle="Each sold loot lot is divided among the party that earned it." onClose={onClose}><div className="modal-scroll sale-modal"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Sale details</strong><small>Choose any accumulated loot in stock.</small></div></div><div className="two-fields"><label className="field">Loot<select value={lootName} onChange={(e) => selectLoot(e.target.value)}>{available.map((item) => <option key={item.name}>{item.name}</option>)}</select><small>{stock?.available.toLocaleString() ?? 0} available</small></label><label className="field">Quantity sold<input type="number" min="1" max={stock?.available} value={quantity} onChange={(e) => selectQuantity(Number(e.target.value))} /></label></div><label className="field">Price per item (PHP)<input type="number" min="0" value={unitPrice || ""} placeholder="0" onChange={(e) => setUnitPrice(Number(e.target.value))} /></label></section><section className="sale-summary"><div><span>Gross sale</span><strong>{peso.format(total)}</strong></div><div><span>Recipients</span><strong>{recipients.length}</strong></div><div className="highlight"><span>Allocated salaries</span><strong>{peso.format(allocatedTotal)}</strong></div></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Party salary allocation</strong><small>Each run’s sold quantity is split only among that run’s selected party members.</small></div></div><div className="recipient-list">{eligibleIds.map((id, index) => { const member = state.members.find((m) => m.id === id)!; const amount = recipientAmounts[id] ?? 0; return <div key={id} className={recipients.includes(id) ? "recipient selected" : "recipient"}><input aria-label={`Include ${member.name}`} type="checkbox" checked={recipients.includes(id)} onChange={() => setRecipients((current) => current.includes(id) ? current.filter((x) => x !== id) : [...current, id])} /><span className={index === 0 ? "queue-number first" : "queue-number"}>{index + 1}</span><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><strong>{member.name}</strong>{index === 0 && <em>First to receive</em>}<span className="recipient-tools"><b>{recipients.includes(id) ? peso.format(amount) : "Skipped"}</b><button type="button" title={`Copy ${member.name}`} aria-label={`Copy ${member.name}`} onClick={() => copyText(`name-${id}`, member.name)}>{copiedKey === `name-${id}` ? <Check size={13} /> : <Copy size={13} />}<span>Name</span></button><button type="button" disabled={!recipients.includes(id)} title={`Copy ${plainAmount.format(amount)}`} aria-label={`Copy salary for ${member.name}`} onClick={() => copyText(`amount-${id}`, String(amount))}>{copiedKey === `amount-${id}` ? <Check size={13} /> : <Copy size={13} />}<span>Salary</span></button></span></div>; })}</div>{!allocationComplete && total > 0 && <div className="allocation-warning">Select at least one member from every contributing party before saving.</div>}</section><section className="form-section mailing-helper"><div className="section-label"><span>3</span><div><strong>Mailing helper</strong><small>Choose a member to generate mail using their exact salary.</small></div></div><label className="mail-recipient">Mail recipient<select value={selectedMailRecipientId} onChange={(event) => setMailRecipientId(event.target.value)}>{recipients.map((id) => <option value={id} key={id}>{state.members.find((member) => member.id === id)?.name ?? "Unknown"}</option>)}</select></label><div className="mail-copy-row"><span>Mail header</span><code>{mailHeader}</code><button type="button" onClick={() => copyText("mail-header", mailHeader)}>{copiedKey === "mail-header" ? <Check size={14} /> : <Copy size={14} />} Copy</button></div><div className="mail-copy-row"><span>Mail content</span><code>{mailContent}</code><button type="button" onClick={() => copyText("mail-content", mailContent)}>{copiedKey === "mail-content" ? <Check size={14} /> : <Copy size={14} />} Copy</button></div></section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" disabled={!allocationComplete || unitPrice <= 0 || quantity < 1 || quantity > (stock?.available ?? 0)} onClick={save}><Coins size={16} /> Save sale & salaries</button></div></Modal>;
 }
 
 function ConfirmModal({ title, text, onCancel, onConfirm }: { title: string; text: string; onCancel: () => void; onConfirm: () => void }) {

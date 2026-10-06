@@ -136,7 +136,10 @@ export default function Home() {
     try {
       const response = await fetch("/api/state", { method: "PUT", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(stamped) });
       if (response.ok) { setConnected(true); setFlash({ type: "good", text: "Saved to Supabase" }); }
-      else { setConnected(false); setFlash({ type: "warn", text: "Saved on this device. Supabase needs the included setup SQL." }); }
+      else {
+        const problem = await response.json().catch(() => null) as { error?: string } | null;
+        setConnected(false); setFlash({ type: "warn", text: problem?.error ?? "Saved on this device while Supabase is unavailable." });
+      }
     } catch {
       setConnected(false);
       setFlash({ type: "warn", text: "Saved on this device while cloud sync is unavailable." });

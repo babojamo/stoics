@@ -34,10 +34,10 @@ $$;
 create or replace function public.save_stoics_loot_state(p_state jsonb, p_actor text) returns void language plpgsql security definer set search_path = public, pg_temp as $$
 begin
   if nullif(trim(p_actor),'') is null then raise exception 'A manager username is required'; end if;
-  delete from public.sale_allocations; delete from public.sale_recipients; delete from public.sales;
-  delete from public.run_loot; delete from public.run_members; delete from public.dungeon_runs;
-  delete from public.payout_queue; delete from public.audit_log; delete from public.loot_items;
-  delete from public.members; delete from public.ledger_metadata;
+  delete from public.sale_allocations where true; delete from public.sale_recipients where true; delete from public.sales where true;
+  delete from public.run_loot where true; delete from public.run_members where true; delete from public.dungeon_runs where true;
+  delete from public.payout_queue where true; delete from public.audit_log where true; delete from public.loot_items where true;
+  delete from public.members where true; delete from public.ledger_metadata where true;
 
   insert into public.members (id,name,active,sort_order)
   select x.value->>'id',x.value->>'name',coalesce((x.value->>'active')::boolean,true),x.ordinality::integer

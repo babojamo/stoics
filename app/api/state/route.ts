@@ -73,6 +73,7 @@ export async function PUT(request: Request) {
     body: JSON.stringify({ p_state: state, p_actor: username }),
   });
   if (response.ok) return Response.json({ ok: true });
+  const failure = await response.clone().json().catch(() => null) as { message?: string } | null;
   if (await rpcIsMissing(response)) {
     const legacyResponse = await fetch(`${url}/rest/v1/stoics_loot_state`, {
       method: "POST",
@@ -81,6 +82,7 @@ export async function PUT(request: Request) {
     });
     if (legacyResponse.ok) return Response.json({ ok: true, legacy: true });
   }
-  return Response.json({ error: "Cloud save is unavailable. Run the relational supabase-schema.sql in Supabase." }, { status: 503 });
+  const detail = failure?.message ? ` ${failure.message}` : "";
+  return Response.json({ error: `Supabase save failed.${detail}` }, { status: 503 });
 }
 

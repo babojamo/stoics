@@ -655,8 +655,7 @@ function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: 
   const allocationComplete = Math.round(allocatedTotal * 100) === Math.round(total * 100);
   const selectedMailRecipientId = recipients.includes(mailRecipientId) ? mailRecipientId : recipients[0] ?? "";
   const mailLootName = quantity === 1 || /s$/i.test(lootName) ? lootName : `${lootName}s`;
-  const mailDate = new Intl.DateTimeFormat("en-US", { month: "numeric", day: "numeric", year: "2-digit" }).format(new Date());
-  const mailHeader = `SOLD ${quantity} ${mailLootName} ${mailDate}`;
+  const mailHeader = `SOLD ${quantity} ${mailLootName}`;
   const selectedMailMember = state.members.find((member) => member.id === selectedMailRecipientId);
   const selectedMailSalary = recipientAmounts[selectedMailRecipientId] ?? 0;
   const mailContent = `Sold ${quantity} ${mailLootName} | ${plainAmount.format(selectedMailSalary)} Total`;

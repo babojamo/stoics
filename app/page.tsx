@@ -85,6 +85,38 @@ function memberNameKey(name: string) {
   return name.trim().toLowerCase().replace(/[il1|]/g, "i").replace(/[^a-z0-9]/g, "");
 }
 
+function recognizedNames(text: string) {
+  const blocked = /^(party|member|leader|level|guild|hp|mp|flyff|universe|invite|leave)$/i;
+  return text.split(/\r?\n/)
+    .map((line) => line.trim().replace(/[^a-zA-Z0-9_\- ]/g, ""))
+    .filter((line) => line.length >= 3 && line.length <= 22 && !blocked.test(line) && !/^\d+$/.test(line));
+}
+
+function mergeNameReadings(first: string[], second: string[]) {
+  const scores = Array.from({ length: first.length + 1 }, () => Array(second.length + 1).fill(0));
+  for (let left = first.length - 1; left >= 0; left -= 1) {
+    for (let right = second.length - 1; right >= 0; right -= 1) {
+      scores[left][right] = memberNameKey(first[left]) === memberNameKey(second[right])
+        ? scores[left + 1][right + 1] + 1
+        : Math.max(scores[left + 1][right], scores[left][right + 1]);
+    }
+  }
+  const merged: string[] = [];
+  let left = 0;
+  let right = 0;
+  while (left < first.length && right < second.length) {
+    if (memberNameKey(first[left]) === memberNameKey(second[right])) {
+      merged.push(first[left]); left += 1; right += 1;
+    } else if (scores[left + 1][right] >= scores[left][right + 1]) {
+      merged.push(first[left]); left += 1;
+    } else {
+      merged.push(second[right]); right += 1;
+    }
+  }
+  merged.push(...first.slice(left), ...second.slice(right));
+  return merged.filter((name, index) => merged.findIndex((candidate) => memberNameKey(candidate) === memberNameKey(name)) === index).slice(0, 8);
+}
+
 async function preparePartyImage(file: File): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file);
@@ -302,11 +334,20 @@ function RunModal({ state, currentUser, onClose, onSave }: { state: LootState; c
   const readImage = async (file: File) => {
     setReading(true); setOcrNote("Reading names from screenshot…");
     try {
-      const { recognize } = await import("tesseract.js");
+      const { createWorker } = await import("tesseract.js");
       const preparedImage = await preparePartyImage(file);
-      const result = await recognize(preparedImage, "eng", { logger: (message) => { if (message.status === "recognizing text") setOcrNote(`Reading names… ${Math.round((message.progress ?? 0) * 100)}%`); } });
-      const blocked = /^(party|member|leader|level|guild|hp|mp|flyff|universe|invite|leave)$/i;
-      const names = result.data.text.split(/\r?\n/).map((line) => line.trim().replace(/[^a-zA-Z0-9_\- ]/g, "")).filter((line) => line.length >= 3 && line.length <= 22 && !blocked.test(line) && !/^\d+$/.test(line)).slice(0, 8);
+      let pass = "original";
+      const worker = await createWorker("eng", undefined, { logger: (message) => { if (message.status === "recognizing text") setOcrNote(`Reading ${pass} image… ${Math.round((message.progress ?? 0) * 100)}%`); } });
+      let originalText = "";
+      let enhancedText = "";
+      try {
+        originalText = (await worker.recognize(file)).data.text;
+        pass = "enhanced";
+        enhancedText = (await worker.recognize(preparedImage)).data.text;
+      } finally {
+        await worker.terminate();
+      }
+      const names = mergeNameReadings(recognizedNames(originalText), recognizedNames(enhancedText));
       if (!names.length) { setOcrNote("No clear names found. Add them manually below."); return; }
       const nextMembers = [...members];
       const nextSelected: string[] = [];

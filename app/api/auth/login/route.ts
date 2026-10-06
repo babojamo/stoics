@@ -14,6 +14,12 @@ export async function POST(request: Request) {
     return Response.json({ error: "Password is incorrect." }, { status: 401 });
   }
   const token = await createSessionToken(username);
-  return Response.json({ ok: true, username, token });
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return new Response(JSON.stringify({ ok: true, username }), {
+    headers: {
+      "content-type": "application/json",
+      "set-cookie": `stoics_session=${token}; Path=/; HttpOnly${secure}; SameSite=Strict; Max-Age=604800`,
+    },
+  });
 }
 

@@ -17,10 +17,8 @@ export async function createSessionToken(username: string) {
 
 export async function getSessionUser(request: Request) {
   const runtime = getRuntimeEnv();
-  const authorization = request.headers.get("authorization") ?? "";
-  const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
   const cookie = request.headers.get("cookie") ?? "";
-  const session = bearer ?? cookie.match(/(?:^|;\s*)stoics_session=([^;]+)/)?.[1];
+  const session = cookie.match(/(?:^|;\s*)stoics_session=([^;]+)/)?.[1];
   if (!session || !runtime.STOICS_MANAGER_PASSWORD) return null;
   const separator = session.lastIndexOf(".");
   if (separator < 1) return null;

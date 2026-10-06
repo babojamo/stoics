@@ -88,7 +88,6 @@ function Logo() {
 export default function Home() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [currentUser, setCurrentUser] = useState("");
-  const [sessionToken, setSessionToken] = useState("");
   const [credentials, setCredentials] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
@@ -106,9 +105,9 @@ export default function Home() {
   const totalSales = state.sales.reduce((sum, sale) => sum + sale.total, 0);
   const salaryPaid = state.sales.reduce((sum, sale) => sum + sale.salaryEach * sale.recipientIds.length, 0);
 
-  const load = useCallback(async (token: string) => {
-    const response = await fetch("/api/state", { cache: "no-store", headers: { Authorization: `Bearer ${token}` } });
-    if (response.status === 401) { localStorage.removeItem("stoics-manager-session"); setSessionToken(""); setAuthenticated(false); return; }
+  const load = useCallback(async () => {
+    const response = await fetch("/api/state", { cache: "no-store", credentials: "same-origin" });
+    if (response.status === 401) { setAuthenticated(false); return; }
     const data = await response.json() as { state: LootState; connected: boolean; reason?: string };
     const local = localStorage.getItem("stoics-loot-state");
     setState(data.connected ? data.state : local ? JSON.parse(local) : data.state);
@@ -117,11 +116,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("stoics-manager-session");
-    if (!storedToken) { setAuthenticated(false); return; }
-    fetch("/api/auth/status", { headers: { Authorization: `Bearer ${storedToken}` } }).then((r) => r.json() as Promise<{ authenticated: boolean; username: string | null }>).then((data) => {
-      if (data.authenticated) { setSessionToken(storedToken); setCurrentUser(data.username ?? "Manager"); load(storedToken); }
-      else { localStorage.removeItem("stoics-manager-session"); setAuthenticated(false); }
+    fetch("/api/auth/status", { credentials: "same-origin", cache: "no-store" }).then((r) => r.json() as Promise<{ authenticated: boolean; username: string | null }>).then((data) => {
+      if (data.authenticated) { setCurrentUser(data.username ?? "Manager"); load(); }
+      else { setAuthenticated(false); }
     }).catch(() => setAuthenticated(false));
   }, [load]);
 
@@ -137,7 +134,7 @@ export default function Home() {
     localStorage.setItem("stoics-loot-state", JSON.stringify(stamped));
     setSaving(true);
     try {
-      const response = await fetch("/api/state", { method: "PUT", headers: { "content-type": "application/json", Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify(stamped) });
+      const response = await fetch("/api/state", { method: "PUT", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(stamped) });
       if (response.ok) { setConnected(true); setFlash({ type: "good", text: "Saved to Supabase" }); }
       else { setConnected(false); setFlash({ type: "warn", text: "Saved on this device. Supabase needs the included setup SQL." }); }
     } catch {
@@ -152,13 +149,16 @@ export default function Home() {
   const login = async (event: React.FormEvent) => {
     event.preventDefault(); setLoginBusy(true); setLoginError("");
     const response = await fetch("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(credentials) });
-    const data = await response.json() as { error?: string; username?: string; token?: string };
+    const data = await response.json() as { error?: string; username?: string };
     if (!response.ok) { setLoginError(data.error ?? "Unable to sign in."); setLoginBusy(false); return; }
-    const token = data.token ?? "";
-    localStorage.setItem("stoics-manager-session", token);
-    setSessionToken(token);
     setCurrentUser(data.username ?? credentials.username.trim());
-    await load(token); setLoginBusy(false);
+    await load(); setLoginBusy(false);
+  };
+
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+    setCurrentUser("");
+    setAuthenticated(false);
   };
 
   if (authenticated === null) return <main className="splash"><LoaderCircle className="spin" /><span>Opening the ledger…</span></main>;
@@ -177,7 +177,7 @@ export default function Home() {
         <div className="sidebar-top"><Logo /><button className="icon-button close-nav" onClick={() => setMobileNav(false)}><X size={18} /></button></div>
         <nav>{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setMobileNav(false); }}>{item.icon}<span>{item.label}</span></button>)}</nav>
         <div className="sidebar-note"><Sparkles size={16} /><div><strong>Fair payout queue</strong><span>Oldest waiting member is shown first.</span></div></div>
-        <button className="signout" onClick={() => { localStorage.removeItem("stoics-manager-session"); setSessionToken(""); setCurrentUser(""); setAuthenticated(false); }}><LogOut size={17} /> Sign out</button>
+        <button className="signout" onClick={logout}><LogOut size={17} /> Sign out</button>
       </aside>
       {mobileNav && <button className="scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
 
@@ -208,7 +208,7 @@ export default function Home() {
 function Login({ credentials, setCredentials, submit, busy, error }: { credentials: { username: string; password: string }; setCredentials: React.Dispatch<React.SetStateAction<{ username: string; password: string }>>; submit: (event: React.FormEvent) => void; busy: boolean; error: string }) {
   return <main className="login-page">
     <section className="login-visual"><div className="visual-glow" /><Logo /><div className="login-copy"><span className="eyebrow">DUNGEON OPERATIONS</span><h1>Every drop tracked.<br />Every member paid.</h1><p>Turn party screenshots into a clean loot ledger, then settle every sale with a fair, transparent payout queue.</p></div><div className="loot-orbit one"><Gem size={28} /></div><div className="loot-orbit two"><Coins size={24} /></div></section>
-    <section className="login-panel"><form onSubmit={submit} className="login-card"><span className="login-icon"><ShieldCheck size={24} /></span><h2>Manager access</h2><p>Use your own username for update attribution, then enter the shared manager password.</p><label>Username<input autoFocus value={credentials.username} onChange={(e) => setCredentials((c) => ({ ...c, username: e.target.value }))} placeholder="Enter your username" /></label><label>Manager password<input type="password" value={credentials.password} onChange={(e) => setCredentials((c) => ({ ...c, password: e.target.value }))} placeholder="Enter manager password" /></label>{error && <div className="form-error">{error}</div>}<button className="primary login-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}{busy ? "Checking…" : "Enter loot ledger"}</button><small>Session saved on this device · Password controlled by the environment</small></form></section>
+    <section className="login-panel"><form onSubmit={submit} className="login-card"><span className="login-icon"><ShieldCheck size={24} /></span><h2>Manager access</h2><p>Use your own username for update attribution, then enter the shared manager password.</p><label>Username<input autoFocus value={credentials.username} onChange={(e) => setCredentials((c) => ({ ...c, username: e.target.value }))} placeholder="Enter your username" /></label><label>Manager password<input type="password" value={credentials.password} onChange={(e) => setCredentials((c) => ({ ...c, password: e.target.value }))} placeholder="Enter manager password" /></label>{error && <div className="form-error">{error}</div>}<button className="primary login-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}{busy ? "Checking…" : "Enter loot ledger"}</button><small>Session secured with an HTTP-only cookie · Password controlled by the environment</small></form></section>
   </main>;
 }
 

@@ -458,9 +458,16 @@ function MemberSearch({ state }: { state: LootState }) {
       }));
       const matchingSales = state.sales.filter((sale) => sale.recipientIds.includes(member.id)
         && (memberMatches || sale.lootName.toLowerCase().includes(normalizedQuery)));
-      const pendingSalary = matchingSales.reduce((total, sale) => total + (sale.recipientAmounts?.[member.id] ?? sale.salaryEach), 0);
-      return { member, memberMatches, pendingLoot: [...pendingLoot.values()], pendingSalary, matchingSales };
-    }).filter((result) => result.memberMatches || result.pendingLoot.length > 0 || result.matchingSales.length > 0)
+      const paidLoot = new Map<string, { name: string; sales: number }>();
+      matchingSales.forEach((sale) => {
+        const key = sale.lootName.trim().toLowerCase();
+        const current = paidLoot.get(key) ?? { name: sale.lootName.trim(), sales: 0 };
+        current.sales += 1;
+        paidLoot.set(key, current);
+      });
+      const totalPaid = matchingSales.reduce((total, sale) => total + (sale.recipientAmounts?.[member.id] ?? sale.salaryEach), 0);
+      return { member, memberMatches, pendingLoot: [...pendingLoot.values()], paidLoot: [...paidLoot.values()], totalPaid };
+    }).filter((result) => result.memberMatches || result.pendingLoot.length > 0 || result.paidLoot.length > 0)
       .sort((left, right) => {
         const leftOrder = payoutOrder.indexOf(left.member.id);
         const rightOrder = payoutOrder.indexOf(right.member.id);
@@ -470,9 +477,9 @@ function MemberSearch({ state }: { state: LootState }) {
   }, [normalizedQuery, payoutOrder, soldByLoot, state]);
 
   return <>
-    <PageTitle eyebrow="MEMBER LEDGER" title="Search members & loot" text="Find a member or loot item and review the salary still due." />
+    <PageTitle eyebrow="MEMBER LEDGER" title="Search members & loot" text="Find pending loot, paid loot, and the total amount paid to each member." />
     <div className="member-search-bar"><Search size={20} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a member or loot item..." />{query && <button aria-label="Clear search" onClick={() => setQuery("")}><X size={16} /></button>}</div>
-    {!normalizedQuery ? <div className="search-welcome"><Search size={28} /><h2>Search the guild ledger</h2><p>Enter a member name or an item such as Sunstone.</p></div> : results.length === 0 ? <div className="search-welcome"><Search size={28} /><h2>No matching records</h2><p>Try another member or loot item name.</p></div> : <><div className="search-result-count">{results.length} {results.length === 1 ? "member" : "members"} found</div><div className="member-results">{results.map(({ member, pendingLoot, pendingSalary, matchingSales }) => <article className="member-result" key={member.id}><div className="member-result-person"><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><div><strong>{member.name}</strong><small>{pendingLoot.length > 0 ? "Waiting for loot sale" : matchingSales.length > 0 ? "Salary ready" : "No pending items"}</small></div></div><div className="member-pending-loot"><span>Pending loot</span><div>{pendingLoot.length > 0 ? pendingLoot.map((loot) => <b key={loot.name}>{loot.quantity.toLocaleString()} × {loot.name}</b>) : <em>None awaiting sale</em>}</div></div><div className="member-pending-salary"><span>Pending salary</span><strong>{pendingSalary > 0 ? peso.format(pendingSalary) : pendingLoot.length > 0 ? "Awaiting sale" : peso.format(0)}</strong>{matchingSales.length > 0 && <small>{matchingSales.length} recorded {matchingSales.length === 1 ? "sale" : "sales"}</small>}</div></article>)}</div></>}
+    {!normalizedQuery ? <div className="search-welcome"><Search size={28} /><h2>Search the guild ledger</h2><p>Enter a member name or an item such as Sunstone.</p></div> : results.length === 0 ? <div className="search-welcome"><Search size={28} /><h2>No matching records</h2><p>Try another member or loot item name.</p></div> : <><div className="search-result-count">{results.length} {results.length === 1 ? "member" : "members"} found</div><div className="member-results">{results.map(({ member, pendingLoot, paidLoot, totalPaid }) => <article className="member-result" key={member.id}><div className="member-result-person"><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><div><strong>{member.name}</strong><small>{pendingLoot.length > 0 ? "Waiting for loot sale" : paidLoot.length > 0 ? "Paid loot recorded" : "No matching loot"}</small></div></div><div className="member-pending-loot"><span>Pending loot</span><div>{pendingLoot.length > 0 ? pendingLoot.map((loot) => <b key={loot.name}>{loot.quantity.toLocaleString()} × {loot.name}</b>) : <em>None awaiting sale</em>}</div></div><div className="member-paid-loot"><span>Paid loot</span><div>{paidLoot.length > 0 ? paidLoot.map((loot) => <b key={loot.name}>{loot.name}{loot.sales > 1 ? ` · ${loot.sales} sales` : ""}</b>) : <em>No paid loot</em>}</div></div><div className="member-total-paid"><span>Total paid</span><strong>{peso.format(totalPaid)}</strong></div></article>)}</div></>}
   </>;
 }
 

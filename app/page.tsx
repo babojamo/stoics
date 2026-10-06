@@ -28,7 +28,7 @@ import {
 import { defaultState } from "../lib/default-state";
 import type { DungeonRun, LootState, Member, RunLoot, Sale } from "../lib/types";
 
-type Tab = "dashboard" | "runs" | "inventory" | "settlements";
+type Tab = "dashboard" | "runs" | "inventory" | "settlements" | "search";
 type Flash = { type: "good" | "warn"; text: string } | null;
 
 const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -342,6 +342,7 @@ export default function Home() {
     { id: "runs", label: "Dungeon runs", icon: <ShieldCheck size={18} /> },
     { id: "inventory", label: "Loot inventory", icon: <Archive size={18} /> },
     { id: "settlements", label: "Sales & salaries", icon: <Coins size={18} /> },
+    { id: "search", label: "Member search", icon: <Search size={18} /> },
   ];
 
   return (
@@ -369,6 +370,7 @@ export default function Home() {
           {tab === "runs" && <Runs state={state} onChange={persist} onRun={() => { setEditingRun(null); setShowRun(true); }} onEdit={(run) => { setEditingRun(run); setShowRun(true); }} />}
           {tab === "inventory" && <Inventory inventory={inventory} onSale={() => setShowSale(true)} />}
           {tab === "settlements" && <Settlements state={state} onSale={() => setShowSale(true)} />}
+          {tab === "search" && <MemberSearch state={state} />}
         </div>
       </section>
 
@@ -434,6 +436,44 @@ function Inventory({ inventory, onSale }: { inventory: ReturnType<typeof invento
 
 function Settlements({ state, onSale }: { state: LootState; onSale: () => void }) {
   return <><PageTitle eyebrow="TREASURY" title="Sales & salaries" text="Every batch sale and the members who received their share." action={<button className="primary" onClick={onSale}><Coins size={17} /> Record batch sale</button>} /><div className="sale-stack">{state.sales.length === 0 ? <div className="empty"><span><ReceiptText size={28} /></span><h2>No sales recorded yet</h2><p>Sell any accumulated loot to calculate the party salary.</p><button className="primary" onClick={onSale}>Record first sale</button></div> : state.sales.map((sale) => { const payouts = recordedPayouts(sale); return <article className="sale-card" key={sale.id}><span className="sale-icon"><Coins /></span><div className="sale-info"><span>{dateTime.format(new Date(sale.createdAt))} · {sale.createdBy ?? "Unknown"}</span><h2>{sale.lootName}</h2><p>{sale.quantity.toLocaleString()} × {peso.format(sale.unitPrice)} each</p></div><div className="sale-total"><span>Total sale</span><strong>{peso.format(sale.total)}</strong></div><div className="salary"><span>{sale.recipientIds.length} recipients</span><strong>Party-based shares</strong><div className="mini-avatars">{sale.recipientIds.slice(0, 6).map((id) => <i key={id}>{state.members.find((m) => m.id === id)?.name.slice(0, 1)}</i>)}</div></div><div className="sale-payout-list">{payouts.map((payout) => <span key={payout.id}><b>{state.members.find((member) => member.id === payout.id)?.name ?? "Unknown"}</b><em>{peso.format(payout.amount)}</em></span>)}</div></article>; })}</div></>;
+}
+
+function MemberSearch({ state }: { state: LootState }) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const soldByLoot = useMemo(() => soldQuantitiesByRunLoot(state), [state]);
+  const payoutOrder = useMemo(() => currentPayoutQueue(state), [state]);
+  const results = useMemo(() => {
+    if (!normalizedQuery) return [];
+    return state.members.map((member) => {
+      const memberMatches = member.name.toLowerCase().includes(normalizedQuery);
+      const pendingLoot = new Map<string, { name: string; quantity: number }>();
+      state.runs.filter((run) => run.memberIds.includes(member.id)).forEach((run) => run.loots.forEach((loot) => {
+        const quantity = loot.quantity - (soldByLoot.get(`${run.id}:${loot.id}`) ?? 0);
+        if (quantity <= 0 || (!memberMatches && !loot.name.toLowerCase().includes(normalizedQuery))) return;
+        const key = loot.name.trim().toLowerCase();
+        const current = pendingLoot.get(key) ?? { name: loot.name.trim(), quantity: 0 };
+        current.quantity += quantity;
+        pendingLoot.set(key, current);
+      }));
+      const matchingSales = state.sales.filter((sale) => sale.recipientIds.includes(member.id)
+        && (memberMatches || sale.lootName.toLowerCase().includes(normalizedQuery)));
+      const pendingSalary = matchingSales.reduce((total, sale) => total + (sale.recipientAmounts?.[member.id] ?? sale.salaryEach), 0);
+      return { member, memberMatches, pendingLoot: [...pendingLoot.values()], pendingSalary, matchingSales };
+    }).filter((result) => result.memberMatches || result.pendingLoot.length > 0 || result.matchingSales.length > 0)
+      .sort((left, right) => {
+        const leftOrder = payoutOrder.indexOf(left.member.id);
+        const rightOrder = payoutOrder.indexOf(right.member.id);
+        if (leftOrder >= 0 || rightOrder >= 0) return (leftOrder < 0 ? Number.MAX_SAFE_INTEGER : leftOrder) - (rightOrder < 0 ? Number.MAX_SAFE_INTEGER : rightOrder);
+        return left.member.name.localeCompare(right.member.name);
+      });
+  }, [normalizedQuery, payoutOrder, soldByLoot, state]);
+
+  return <>
+    <PageTitle eyebrow="MEMBER LEDGER" title="Search members & loot" text="Find a member or loot item and review the salary still due." />
+    <div className="member-search-bar"><Search size={20} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a member or loot item..." />{query && <button aria-label="Clear search" onClick={() => setQuery("")}><X size={16} /></button>}</div>
+    {!normalizedQuery ? <div className="search-welcome"><Search size={28} /><h2>Search the guild ledger</h2><p>Enter a member name or an item such as Sunstone.</p></div> : results.length === 0 ? <div className="search-welcome"><Search size={28} /><h2>No matching records</h2><p>Try another member or loot item name.</p></div> : <><div className="search-result-count">{results.length} {results.length === 1 ? "member" : "members"} found</div><div className="member-results">{results.map(({ member, pendingLoot, pendingSalary, matchingSales }) => <article className="member-result" key={member.id}><div className="member-result-person"><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><div><strong>{member.name}</strong><small>{pendingLoot.length > 0 ? "Waiting for loot sale" : matchingSales.length > 0 ? "Salary ready" : "No pending items"}</small></div></div><div className="member-pending-loot"><span>Pending loot</span><div>{pendingLoot.length > 0 ? pendingLoot.map((loot) => <b key={loot.name}>{loot.quantity.toLocaleString()} × {loot.name}</b>) : <em>None awaiting sale</em>}</div></div><div className="member-pending-salary"><span>Pending salary</span><strong>{pendingSalary > 0 ? peso.format(pendingSalary) : pendingLoot.length > 0 ? "Awaiting sale" : peso.format(0)}</strong>{matchingSales.length > 0 && <small>{matchingSales.length} recorded {matchingSales.length === 1 ? "sale" : "sales"}</small>}</div></article>)}</div></>}
+  </>;
 }
 
 function RunModal({ state, run, currentUser, onClose, onSave }: { state: LootState; run?: DungeonRun; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {

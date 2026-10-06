@@ -86,20 +86,24 @@ function currentPayoutQueue(state: LootState) {
   return ordered.filter((id, index) => ordered.indexOf(id) === index);
 }
 
-function unpaidPayoutQueue(state: LootState) {
-  const paidAt = new Map<string, number>();
-  state.sales.forEach((sale) => recordedPayouts(sale).forEach((payout) => {
-    if (payout.amount <= 0) return;
-    paidAt.set(payout.id, Math.max(paidAt.get(payout.id) ?? 0, new Date(sale.createdAt).getTime()));
-  }));
+function pendingLootByMember(state: LootState) {
   const soldByLoot = soldQuantitiesByRunLoot(state);
-  return currentPayoutQueue(state).filter((id) => {
-    const lastPaidAt = paidAt.get(id);
-    if (lastPaidAt === undefined) return true;
-    return state.runs.some((run) => run.memberIds.includes(id)
-      && new Date(run.createdAt).getTime() > lastPaidAt
-      && run.loots.some((loot) => (soldByLoot.get(`${run.id}:${loot.id}`) ?? 0) < loot.quantity));
-  });
+  const pending = new Map<string, Map<string, { name: string; quantity: number }>>();
+  state.runs.forEach((run) => run.loots.forEach((loot) => {
+    const quantity = loot.quantity - (soldByLoot.get(`${run.id}:${loot.id}`) ?? 0);
+    if (quantity <= 0) return;
+    run.memberIds.forEach((memberId) => {
+      const memberLoot = pending.get(memberId) ?? new Map<string, { name: string; quantity: number }>();
+      const key = loot.name.trim().toLowerCase();
+      const current = memberLoot.get(key) ?? { name: loot.name.trim(), quantity: 0 };
+      current.quantity += quantity;
+      memberLoot.set(key, current);
+      pending.set(memberId, memberLoot);
+    });
+  }));
+  return new Map([...pending].map(([memberId, loots]) => [memberId, [...loots.values()]
+    .map((loot) => `${loot.quantity} ${loot.name}${loot.quantity === 1 || /s$/i.test(loot.name) ? "" : "s"} pending`)
+    .join(" · ")]));
 }
 
 function contributingLotsForSale(state: LootState, lootName: string, quantity: number) {
@@ -386,13 +390,14 @@ function PageTitle({ eyebrow, title, text, action }: { eyebrow: string; title: s
 }
 
 function Dashboard({ state, inventory, totalStock, totalSales, salaryPaid, onRun, onSale }: { state: LootState; inventory: ReturnType<typeof inventoryFor>; totalStock: number; totalSales: number; salaryPaid: number; onRun: () => void; onSale: () => void }) {
-  const payoutQueue = unpaidPayoutQueue(state);
+  const payoutQueue = currentPayoutQueue(state);
+  const pendingLoot = pendingLootByMember(state);
   return <>
     <PageTitle eyebrow="CONTROL ROOM" title="Loot overview" text="A live view of your runs, stock, and guild payouts." action={<div className="title-actions"><button className="secondary" onClick={onSale}><Coins size={17} /> Record sale</button><button className="primary" onClick={onRun}><Plus size={17} /> New run</button></div>} />
     <div className="metric-grid"><Metric icon={<PackageOpen />} tone="violet" label="Loot in inventory" value={totalStock.toLocaleString()} note={`${inventory.filter((i) => i.available > 0).length} item types`} /><Metric icon={<ReceiptText />} tone="amber" label="Gross sales" value={peso.format(totalSales)} note={`${state.sales.length} recorded batches`} /><Metric icon={<Coins />} tone="mint" label="Salary distributed" value={peso.format(salaryPaid)} note="Even shares, rounded down" /><Metric icon={<Users />} tone="blue" label="Active members" value={state.members.filter((m) => m.active).length.toString()} note="In payout rotation" /></div>
     <div className="dashboard-grid">
       <section className="panel"><div className="panel-head"><div><span className="panel-kicker">INVENTORY</span><h2>Ready to sell</h2></div><button className="text-button" onClick={onSale}>Sell a batch <ChevronRight size={15} /></button></div><div className="inventory-preview">{inventory.slice(0, 5).map((item, index) => <div className="inventory-line" key={item.name}><span className={`item-rune rune-${index % 4}`}><Gem size={18} /></span><div><strong>{item.name}</strong><small>{item.collected.toLocaleString()} collected</small></div><b>{item.available.toLocaleString()}</b><span>available</span></div>)}</div></section>
-      <section className="panel"><div className="panel-head"><div><span className="panel-kicker">PAYOUT ORDER</span><h2>Who receives next</h2></div><span className="queue-badge">FIFO</span></div><div className="queue-list">{payoutQueue.length === 0 ? <p className="queue-empty">All eligible members have been paid.</p> : payoutQueue.slice(0, 6).map((id, index) => { const member = state.members.find((m) => m.id === id); return member ? <div className="queue-row" key={id}><span className={index === 0 ? "queue-number first" : "queue-number"}>{index + 1}</span><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><strong>{member.name}</strong>{index === 0 && <em>Receives first</em>}</div> : null; })}</div></section>
+      <section className="panel"><div className="panel-head"><div><span className="panel-kicker">PAYOUT ORDER</span><h2>Who receives next</h2></div><span className="queue-badge">FIFO</span></div><div className="queue-list">{payoutQueue.length === 0 ? <p className="queue-empty">No members have unpaid loot.</p> : payoutQueue.map((id, index) => { const member = state.members.find((m) => m.id === id); return member ? <div className="queue-row" key={id}><span className={index === 0 ? "queue-number first" : "queue-number"}>{index + 1}</span><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><strong>{member.name}</strong><em>{pendingLoot.get(id) ?? (index === 0 ? "Receives first" : "Pending payment")}</em></div> : null; })}</div></section>
     </div>
     <section className="panel recent"><div className="panel-head"><div><span className="panel-kicker">RECENT ACTIVITY</span><h2>Latest dungeon runs</h2></div></div><div className="table-wrap"><table><thead><tr><th>Dungeon</th><th>Date</th><th>Party</th><th>Loot types</th><th>Total units</th></tr></thead><tbody>{state.runs.slice(0, 5).map((run) => <tr key={run.id}><td><strong>{run.dungeon}</strong></td><td>{dateTime.format(new Date(run.createdAt))}</td><td>{run.memberIds.length} members</td><td>{run.loots.length}</td><td><b>{run.loots.reduce((sum, loot) => sum + loot.quantity, 0)}</b></td></tr>)}</tbody></table></div></section>
     <section className="panel audit-panel"><div className="panel-head"><div><span className="panel-kicker">AUDIT TRAIL</span><h2>Who changed the ledger</h2></div>{state.lastUpdatedBy && <span className="last-editor">Last updated by <strong>{state.lastUpdatedBy}</strong></span>}</div><div className="audit-list">{(state.auditLog ?? []).length === 0 ? <p>No updates recorded yet.</p> : state.auditLog.slice(0, 6).map((entry) => <div className="audit-row" key={entry.id}><span className="avatar">{entry.username.slice(0, 2).toUpperCase()}</span><div><strong>{entry.username}</strong><span>{entry.action}</span></div><time>{dateTime.format(new Date(entry.createdAt))}</time></div>)}</div></section>

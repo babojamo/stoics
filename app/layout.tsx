@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   title: "Stoics Loots — Flyff Universe Loot Ledger",
   description: "Track dungeon parties, loot inventory, batch sales, and fair member salaries.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/stoics-icon.png",
+    shortcut: "/stoics-icon.png",
   },
 };
 

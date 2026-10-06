@@ -5,7 +5,6 @@
 :root { --ink:#17202a; --muted:#6f7784; --line:#e7e4dc; --paper:#f6f4ee; --card:#fff; --violet:#6556d8; --violet-dark:#4d3fc0; --gold:#d79836; --mint:#198d76; }
 * { box-sizing:border-box; }
 button,input,select,textarea { font-family:inherit; }
-.brand strong,.login-copy h1,.login-card h2,.page-title h1,.metric>strong,.panel h2,.run-date strong,.run-title h2,.stock-name h2,.stock-stats strong,.sale-info h2,.sale-total strong,.salary strong,.empty h2,.modal-head h2,.sale-summary strong { font-family:"Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:-.025em; }
 html,body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); font-family:"Google Sans","Segoe UI",Arial,sans-serif; }
 button,input,select { font:inherit; }
 button { cursor:pointer; }
@@ -14,12 +13,13 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 @keyframes spin { to { transform:rotate(360deg); } }
 .splash { min-height:100vh; display:flex; align-items:center; justify-content:center; gap:12px; color:var(--violet); font-weight:700; }
 .brand { display:flex; align-items:center; gap:11px; }
-.brand-mark { width:38px; height:38px; display:grid; place-items:center; border-radius:12px; color:white; background:linear-gradient(145deg,#7869e7,#4b3aad); box-shadow:0 7px 18px #5a48c638; }
+.brand-mark { width:46px; height:46px; display:block; flex:none; overflow:hidden; border:1px solid #ffffff2b; border-radius:13px; background:#242234; box-shadow:0 8px 22px #05051455; }
+.brand-mark img { display:block; width:100%; height:100%; object-fit:cover; }
 .brand strong,.brand small { display:block; line-height:1; letter-spacing:.13em; }
 .brand strong { font-family:Georgia,serif; font-size:18px; }.brand small { margin-top:5px; font-size:8px; color:#8d92a0; font-weight:800; }
 .login-page { min-height:100vh; display:grid; grid-template-columns:minmax(420px,1.12fr) minmax(420px,.88fr); background:#f8f7f3; }
 .login-visual { position:relative; overflow:hidden; min-height:100vh; padding:48px 7vw; color:white; background:radial-gradient(circle at 70% 20%,#7668cf55,transparent 30%),linear-gradient(150deg,#1c1c31 0%,#292346 56%,#171826 100%); }
-.login-visual .brand { position:relative; z-index:2; }.login-visual .brand small { color:#bdb8d6; }.visual-glow { position:absolute; width:530px; height:530px; border:1px solid #ffffff12; border-radius:50%; right:-90px; bottom:-80px; box-shadow:0 0 0 70px #ffffff08,0 0 0 140px #ffffff05; }
+.login-visual .brand { position:relative; z-index:2; }.login-visual .brand-mark { width:64px; height:64px; border-radius:18px; box-shadow:0 12px 34px #0008,0 0 0 1px #78caff35; }.login-visual .brand small { color:#bdb8d6; }.visual-glow { position:absolute; width:530px; height:530px; border:1px solid #ffffff12; border-radius:50%; right:-90px; bottom:-80px; box-shadow:0 0 0 70px #ffffff08,0 0 0 140px #ffffff05; }
 .login-copy { position:relative; z-index:2; max-width:670px; margin-top:24vh; }.eyebrow { font-size:10px; font-weight:900; letter-spacing:.18em; color:var(--violet); }.login-copy .eyebrow { color:#d2b175; }.login-copy h1 { margin:18px 0; font:500 clamp(44px,5.4vw,76px)/1.02 Georgia,serif; letter-spacing:-.035em; }.login-copy p { max-width:570px; font-size:17px; line-height:1.7; color:#c9c6d5; }
 .loot-orbit { position:absolute; display:grid; place-items:center; border:1px solid #ffffff20; border-radius:50%; color:#e4c27e; backdrop-filter:blur(8px); background:#ffffff0c; }.loot-orbit.one { width:92px; height:92px; right:12%; top:17%; transform:rotate(12deg); }.loot-orbit.two { width:70px; height:70px; left:15%; bottom:12%; }
 .login-panel { display:grid; place-items:center; padding:44px; }.login-card { width:min(100%,420px); }.login-icon { display:grid; place-items:center; width:52px; height:52px; color:var(--violet); border-radius:16px; background:#ece9ff; }.login-card h2 { margin:25px 0 7px; font:500 34px/1.1 Georgia,serif; }.login-card>p { margin:0 0 30px; color:var(--muted); line-height:1.55; }.login-card label,.field { display:grid; gap:8px; margin:17px 0; font-size:12px; color:#525966; font-weight:800; }.login-card input,.field input,.field select { width:100%; height:48px; border:1px solid #dddbe0; border-radius:11px; background:white; padding:0 14px; outline:none; color:var(--ink); }.login-card input:focus,.field input:focus,.field select:focus { border-color:#8174dd; box-shadow:0 0 0 3px #7869e716; }.primary,.secondary { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:42px; border-radius:10px; border:0; padding:0 17px; font-size:13px; font-weight:800; }.primary { color:white; background:var(--violet); box-shadow:0 8px 18px #6656d827; }.primary:hover { background:var(--violet-dark); }.secondary { color:#4c5260; background:#fff; border:1px solid #dddbe0; }.login-button { width:100%; height:50px; margin-top:9px; }.login-card>small { display:block; margin-top:16px; text-align:center; color:#9a9ca4; }.form-error { padding:10px 12px; border-radius:9px; background:#fff0ef; color:#b8413c; font-size:12px; }
@@ -36,6 +36,7 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .user-badge small { color:#9a9da6; font-size:8px; }
 .user-badge strong { max-width:120px; overflow:hidden; text-overflow:ellipsis; font-size:10px; }
 .topbar .sync { margin-left:0; }
+.brand strong,.login-copy h1,.login-card h2,.page-title h1,.metric>strong,.panel h2,.run-date strong,.run-title h2,.stock-name h2,.stock-stats strong,.sale-info h2,.sale-total strong,.salary strong,.empty h2,.modal-head h2,.sale-summary strong { font-family:"Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:-.025em; }
 .audit-panel { margin-top:16px; }
 .last-editor { color:#8e929b; font-size:10px; }
 .last-editor strong { color:#5a4eb5; }

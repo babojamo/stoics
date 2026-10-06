@@ -82,7 +82,7 @@ function eligibleMembersForSale(state: LootState, lootName: string, quantity: nu
 }
 
 function Logo() {
-  return <div className="brand"><span className="brand-mark"><Gem size={20} /></span><div><strong>STOICS</strong><small>LOOT LEDGER</small></div></div>;
+  return <div className="brand"><span className="brand-mark"><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>LOOT LEDGER</small></div></div>;
 }
 
 export default function Home() {

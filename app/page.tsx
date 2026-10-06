@@ -11,6 +11,7 @@ import {
   ImagePlus,
   LayoutDashboard,
   LoaderCircle,
+  Lock,
   LogOut,
   Menu,
   PackageOpen,
@@ -51,6 +52,24 @@ function inventoryFor(state: LootState) {
     if (row) row.sold += sale.quantity;
   });
   return [...map.values()].map((row) => ({ ...row, available: row.collected - row.sold })).sort((a, b) => b.available - a.available);
+}
+
+function soldQuantitiesByRunLoot(state: LootState) {
+  const remainingSold = new Map<string, number>();
+  state.sales.forEach((sale) => {
+    const key = sale.lootName.trim().toLowerCase();
+    remainingSold.set(key, (remainingSold.get(key) ?? 0) + sale.quantity);
+  });
+  const soldByLoot = new Map<string, number>();
+  [...state.runs]
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
+    .forEach((run) => run.loots.forEach((loot) => {
+      const nameKey = loot.name.trim().toLowerCase();
+      const sold = Math.min(loot.quantity, remainingSold.get(nameKey) ?? 0);
+      soldByLoot.set(`${run.id}:${loot.id}`, sold);
+      remainingSold.set(nameKey, Math.max(0, (remainingSold.get(nameKey) ?? 0) - sold));
+    }));
+  return soldByLoot;
 }
 
 function contributingLotsForSale(state: LootState, lootName: string, quantity: number) {
@@ -351,15 +370,23 @@ function Metric({ icon, tone, label, value, note }: { icon: React.ReactNode; ton
 
 function Runs({ state, onChange, onRun, onEdit }: { state: LootState; onChange: (next: LootState, action?: string) => void; onRun: () => void; onEdit: (run: DungeonRun) => void }) {
   const [pendingDelete, setPendingDelete] = useState<DungeonRun | null>(null);
+  const soldByLoot = useMemo(() => soldQuantitiesByRunLoot(state), [state]);
+  const runHasSales = (run: DungeonRun) => run.loots.some((loot) => (soldByLoot.get(`${run.id}:${loot.id}`) ?? 0) > 0);
   const removeRun = () => {
-    if (!pendingDelete) return;
+    if (!pendingDelete || runHasSales(pendingDelete)) return;
     onChange({ ...state, runs: state.runs.filter((run) => run.id !== pendingDelete.id) }, `Deleted ${pendingDelete.dungeon}`);
     setPendingDelete(null);
   };
-  return <><PageTitle eyebrow="RUN HISTORY" title="Dungeon runs" text="Review and edit each dungeon, party roster, and loot record." action={<button className="primary" onClick={onRun}><Plus size={17} /> Add dungeon run</button>} /><div className="run-stack">{state.runs.map((run) => <article className="run-card" key={run.id}><div className="run-date"><strong>{new Date(run.createdAt).getDate()}</strong><span>{new Date(run.createdAt).toLocaleString("en", { month: "short" })}</span></div><div className="run-main"><div className="run-title"><div><h2>{run.dungeon}</h2><span>{dateTime.format(new Date(run.createdAt))} · Added by {run.createdBy ?? "Unknown"}</span></div><div className="run-actions"><button className="icon-button" aria-label={`Edit ${run.dungeon}`} onClick={() => onEdit(run)}><Pencil size={15} /></button><button className="icon-button danger" aria-label={`Delete ${run.dungeon}`} onClick={() => setPendingDelete(run)}><Trash2 size={16} /></button></div></div><div className="run-section"><label>Party</label><div className="chips">{run.memberIds.map((id) => <span className="member-chip" key={id}>{state.members.find((m) => m.id === id)?.name ?? "Unknown"}</span>)}</div></div><div className="run-section"><label>Loot</label><div className="loot-grid">{run.loots.map((loot) => <EditableLoot key={loot.id} loot={loot} onChange={(updated) => onChange({ ...state, runs: state.runs.map((candidate) => candidate.id === run.id ? { ...candidate, loots: candidate.loots.map((entry) => entry.id === loot.id ? updated : entry) } : candidate) }, `Edited ${loot.name || "a loot item"}`)} />)}</div></div></div></article>)}</div>{pendingDelete && <ConfirmModal title="Delete dungeon run?" text={`Delete ${pendingDelete.dungeon} and its party and loot record? This can change inventory totals and future salary eligibility.`} onCancel={() => setPendingDelete(null)} onConfirm={removeRun} />}</>;
+  return <><PageTitle eyebrow="RUN HISTORY" title="Dungeon runs" text="Review each party and see which loot has already been sold." action={<button className="primary" onClick={onRun}><Plus size={17} /> Add dungeon run</button>} /><div className="run-stack">{state.runs.map((run) => {
+    const locked = runHasSales(run);
+    return <article className={`run-card ${locked ? "locked" : ""}`} key={run.id}><div className="run-date"><strong>{new Date(run.createdAt).getDate()}</strong><span>{new Date(run.createdAt).toLocaleString("en", { month: "short" })}</span></div><div className="run-main"><div className="run-title"><div><div className="run-heading"><h2>{run.dungeon}</h2>{locked && <span className="run-locked"><Lock size={11} /> Sale recorded · Run locked</span>}</div><span>{dateTime.format(new Date(run.createdAt))} · Added by {run.createdBy ?? "Unknown"}</span></div><div className="run-actions"><button className="icon-button" disabled={locked} title={locked ? "This run cannot be edited because some loot has been sold" : "Edit run"} aria-label={`Edit ${run.dungeon}`} onClick={() => onEdit(run)}><Pencil size={15} /></button><button className="icon-button danger" disabled={locked} title={locked ? "This run cannot be deleted because some loot has been sold" : "Delete run"} aria-label={`Delete ${run.dungeon}`} onClick={() => setPendingDelete(run)}><Trash2 size={16} /></button></div></div><div className="run-section"><label>Party</label><div className="chips">{run.memberIds.map((id) => <span className="member-chip" key={id}>{state.members.find((m) => m.id === id)?.name ?? "Unknown"}</span>)}</div></div><div className="run-section"><label>Loot</label><div className="loot-grid">{run.loots.map((loot) => <EditableLoot key={loot.id} loot={loot} soldQuantity={soldByLoot.get(`${run.id}:${loot.id}`) ?? 0} locked={locked} onChange={(updated) => onChange({ ...state, runs: state.runs.map((candidate) => candidate.id === run.id ? { ...candidate, loots: candidate.loots.map((entry) => entry.id === loot.id ? updated : entry) } : candidate) }, `Edited ${loot.name || "a loot item"}`)} />)}</div></div></div></article>;
+  })}</div>{pendingDelete && <ConfirmModal title="Delete dungeon run?" text={`Delete ${pendingDelete.dungeon} and its party and loot record? This can change inventory totals and future salary eligibility.`} onCancel={() => setPendingDelete(null)} onConfirm={removeRun} />}</>;
 }
 
-function EditableLoot({ loot, onChange }: { loot: RunLoot; onChange: (loot: RunLoot) => void }) { return <div className="editable-loot"><Gem size={16} /><input value={loot.name} onChange={(e) => onChange({ ...loot, name: e.target.value })} /><input className="qty" type="number" min="0" value={loot.quantity} onChange={(e) => onChange({ ...loot, quantity: Number(e.target.value) })} /></div>; }
+function EditableLoot({ loot, soldQuantity, locked, onChange }: { loot: RunLoot; soldQuantity: number; locked: boolean; onChange: (loot: RunLoot) => void }) {
+  const status = soldQuantity >= loot.quantity ? "All sold" : soldQuantity > 0 ? `${soldQuantity} of ${loot.quantity} sold` : "Unsold";
+  return <div className={`editable-loot ${soldQuantity > 0 ? "has-sales" : ""}`}><Gem size={16} /><input aria-label={`${loot.name} name`} disabled={locked} value={loot.name} onChange={(e) => onChange({ ...loot, name: e.target.value })} /><input aria-label={`${loot.name} quantity`} className="qty" type="number" min="0" disabled={locked} value={loot.quantity} onChange={(e) => onChange({ ...loot, quantity: Number(e.target.value) })} /><span className={`loot-sale-status ${soldQuantity >= loot.quantity ? "complete" : soldQuantity > 0 ? "partial" : "unsold"}`}>{status}</span></div>;
+}
 
 function Inventory({ inventory, onSale }: { inventory: ReturnType<typeof inventoryFor>; onSale: () => void }) {
   const [query, setQuery] = useState("");

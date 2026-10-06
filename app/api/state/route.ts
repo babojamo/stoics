@@ -23,6 +23,7 @@ function normalizeState(value: Partial<LootState> | null | undefined): LootState
     members: value?.members ?? [],
     runs: value?.runs ?? [],
     sales: value?.sales ?? [],
+    vendingPrices: value?.vendingPrices ?? {},
     payoutQueue: value?.payoutQueue ?? [],
     auditLog: value?.auditLog ?? [],
     lastUpdatedBy: value?.lastUpdatedBy,
@@ -72,7 +73,23 @@ export async function PUT(request: Request) {
     headers: supabaseHeaders(),
     body: JSON.stringify({ p_state: state, p_actor: username }),
   });
-  if (response.ok) return Response.json({ ok: true });
+  if (response.ok) {
+    const prices = state.vendingPrices ?? {};
+    if (Object.keys(prices).length > 0) {
+      const verifyResponse = await fetch(`${url}/rest/v1/rpc/get_stoics_loot_state`, {
+        method: "POST", headers: supabaseHeaders(), body: "{}", cache: "no-store",
+      });
+      if (verifyResponse.ok) {
+        const saved = normalizeState((await verifyResponse.json()) as LootState);
+        const pricesPersisted = Object.entries(prices).every(([name, amount]) => {
+          const savedAmount = Object.entries(saved.vendingPrices).find(([savedName]) => savedName.trim().toLowerCase() === name.trim().toLowerCase())?.[1];
+          return Number(savedAmount) === Number(amount);
+        });
+        if (!pricesPersisted) return Response.json({ error: "Vending amounts need the updated supabase-schema.sql before cloud saving." }, { status: 503 });
+      }
+    }
+    return Response.json({ ok: true });
+  }
   const failure = await response.clone().json().catch(() => null) as { message?: string } | null;
   if (await rpcIsMissing(response)) {
     const legacyResponse = await fetch(`${url}/rest/v1/stoics_loot_state`, {

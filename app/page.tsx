@@ -38,6 +38,11 @@ const dateTime = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeri
 const makeId = () => crypto.randomUUID();
 const cloneSeed = () => JSON.parse(JSON.stringify(defaultState)) as LootState;
 
+function vendingPriceFor(state: LootState, lootName: string) {
+  const match = Object.entries(state.vendingPrices ?? {}).find(([name]) => name.trim().toLowerCase() === lootName.trim().toLowerCase());
+  return Number(match?.[1] ?? 0);
+}
+
 function inventoryFor(state: LootState) {
   const map = new Map<string, { name: string; collected: number; sold: number; available: number; runIds: string[] }>();
   state.runs.forEach((run) => run.loots.forEach((loot) => {
@@ -51,7 +56,7 @@ function inventoryFor(state: LootState) {
     const row = map.get(sale.lootName.trim().toLowerCase());
     if (row) row.sold += sale.quantity;
   });
-  return [...map.values()].map((row) => ({ ...row, available: row.collected - row.sold })).sort((a, b) => b.available - a.available);
+  return [...map.values()].map((row) => ({ ...row, available: row.collected - row.sold, vendingAmount: vendingPriceFor(state, row.name) })).sort((a, b) => b.available - a.available);
 }
 
 function soldQuantitiesByRunLoot(state: LootState) {
@@ -173,6 +178,29 @@ function recordedPayouts(sale: Sale) {
   return sale.recipientIds.map((id) => ({ id, amount: sale.recipientAmounts?.[id] ?? sale.salaryEach }));
 }
 
+function estimatedPendingSalaryForMember(state: LootState, memberId: string, lootQuery?: string) {
+  const soldByLoot = soldQuantitiesByRunLoot(state);
+  const payoutOrder = currentPayoutQueue(state);
+  const activeIds = new Set(state.members.filter((member) => member.active).map((member) => member.id));
+  let totalCents = 0;
+  state.runs.filter((run) => run.memberIds.includes(memberId)).forEach((run) => run.loots.forEach((loot) => {
+    if (lootQuery && !loot.name.toLowerCase().includes(lootQuery)) return;
+    const quantity = loot.quantity - (soldByLoot.get(`${run.id}:${loot.id}`) ?? 0);
+    const vendingAmount = vendingPriceFor(state, loot.name);
+    if (quantity <= 0 || vendingAmount <= 0) return;
+    const party = [
+      ...payoutOrder.filter((id) => run.memberIds.includes(id) && activeIds.has(id)),
+      ...run.memberIds.filter((id) => activeIds.has(id) && !payoutOrder.includes(id)),
+    ];
+    const position = party.indexOf(memberId);
+    if (position < 0 || party.length === 0) return;
+    const lotCents = Math.round(quantity * vendingAmount * 100);
+    const baseCents = Math.floor(lotCents / party.length);
+    totalCents += baseCents + (position < lotCents - baseCents * party.length ? 1 : 0);
+  }));
+  return totalCents / 100;
+}
+
 function memberNameKey(name: string) {
   return name.normalize("NFKC").trim().toLowerCase().replace(/[il1|]/g, "i").replace(/[^\p{L}\p{N}]/gu, "");
 }
@@ -280,7 +308,8 @@ export default function Home() {
     if (response.status === 401) { setAuthenticated(false); return; }
     const data = await response.json() as { state: LootState; connected: boolean; reason?: string };
     const local = localStorage.getItem("stoics-loot-state");
-    setState(data.connected ? data.state : local ? JSON.parse(local) : data.state);
+    const localState = local ? JSON.parse(local) as LootState : null;
+    setState(data.connected ? { ...data.state, vendingPrices: Object.keys(data.state.vendingPrices ?? {}).length > 0 ? data.state.vendingPrices : localState?.vendingPrices ?? {} } : localState ?? data.state);
     setConnected(Boolean(data.connected));
     setAuthenticated(true);
   }, []);
@@ -368,7 +397,7 @@ export default function Home() {
           {flash && <div className={`flash ${flash.type}`}><Check size={16} />{flash.text}</div>}
           {tab === "dashboard" && <Dashboard state={state} inventory={inventory} totalStock={totalStock} totalSales={totalSales} salaryPaid={salaryPaid} onRun={() => setShowRun(true)} onSale={() => setShowSale(true)} />}
           {tab === "runs" && <Runs state={state} onChange={persist} onRun={() => { setEditingRun(null); setShowRun(true); }} onEdit={(run) => { setEditingRun(run); setShowRun(true); }} />}
-          {tab === "inventory" && <Inventory inventory={inventory} onSale={() => setShowSale(true)} />}
+          {tab === "inventory" && <Inventory inventory={inventory} onSale={() => setShowSale(true)} onPriceChange={(name, amount) => persist({ ...state, vendingPrices: { ...(state.vendingPrices ?? {}), [name.trim().toLowerCase()]: amount } }, `Updated ${name} vending amount`)} />}
           {tab === "settlements" && <Settlements state={state} onSale={() => setShowSale(true)} />}
           {tab === "search" && <MemberSearch state={state} />}
         </div>
@@ -428,10 +457,16 @@ function EditableLoot({ loot, soldQuantity, locked, onChange }: { loot: RunLoot;
   return <div className={`editable-loot ${soldQuantity > 0 ? "has-sales" : ""}`}><Gem size={16} /><input aria-label={`${loot.name} name`} disabled={locked} value={loot.name} onChange={(e) => onChange({ ...loot, name: e.target.value })} /><input aria-label={`${loot.name} quantity`} className="qty" type="number" min="0" disabled={locked} value={loot.quantity} onChange={(e) => onChange({ ...loot, quantity: Number(e.target.value) })} /><span className={`loot-sale-status ${soldQuantity >= loot.quantity ? "complete" : soldQuantity > 0 ? "partial" : "unsold"}`}>{status}</span></div>;
 }
 
-function Inventory({ inventory, onSale }: { inventory: ReturnType<typeof inventoryFor>; onSale: () => void }) {
+function Inventory({ inventory, onSale, onPriceChange }: { inventory: ReturnType<typeof inventoryFor>; onSale: () => void; onPriceChange: (name: string, amount: number) => void }) {
   const [query, setQuery] = useState("");
   const shown = inventory.filter((item) => item.name.toLowerCase().includes(query.toLowerCase()));
-  return <><PageTitle eyebrow="STOCK ROOM" title="Loot inventory" text="Accumulated loot from every run, minus recorded batch sales." action={<button className="primary" onClick={onSale}><Coins size={17} /> Sell loot</button>} /><div className="inventory-toolbar"><div className="search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search loot…" /></div><span>{shown.length} item types</span></div><div className="inventory-cards">{shown.map((item, index) => <article className="stock-card" key={item.name}><div className={`stock-icon rune-${index % 4}`}><Gem /></div><div className="stock-name"><span>LOOT ITEM</span><h2>{item.name}</h2></div><div className="stock-stats"><div><span>Collected</span><strong>{item.collected.toLocaleString()}</strong></div><div><span>Sold</span><strong>{item.sold.toLocaleString()}</strong></div><div className="available"><span>Available</span><strong>{item.available.toLocaleString()}</strong></div></div><button className="secondary" disabled={item.available <= 0} onClick={onSale}>Record sale</button></article>)}</div></>;
+  return <><PageTitle eyebrow="STOCK ROOM" title="Loot inventory" text="Accumulated loot, recorded sales, and the expected vending amount for each item." action={<button className="primary" onClick={onSale}><Coins size={17} /> Sell loot</button>} /><div className="inventory-toolbar"><div className="search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search loot…" /></div><span>{shown.length} item types</span></div><div className="inventory-cards">{shown.map((item, index) => <article className="stock-card" key={item.name}><div className={`stock-icon rune-${index % 4}`}><Gem /></div><div className="stock-name"><span>LOOT ITEM</span><h2>{item.name}</h2></div><div className="stock-stats"><div><span>Collected</span><strong>{item.collected.toLocaleString()}</strong></div><div><span>Sold</span><strong>{item.sold.toLocaleString()}</strong></div><div className="available"><span>Available</span><strong>{item.available.toLocaleString()}</strong></div><div className="vending-price"><span>Vending amount</span><VendingPriceInput value={item.vendingAmount} onCommit={(amount) => onPriceChange(item.name, amount)} /></div></div><button className="secondary" disabled={item.available <= 0} onClick={onSale}>Record sale</button></article>)}</div></>;
+}
+
+function VendingPriceInput({ value, onCommit }: { value: number; onCommit: (value: number) => void }) {
+  const [draft, setDraft] = useState(value ? String(value) : "");
+  const commit = () => { const amount = Math.max(0, Number(draft) || 0); setDraft(amount ? String(amount) : ""); if (amount !== value) onCommit(amount); };
+  return <label><b>₱</b><input aria-label="Vending amount" type="number" min="0" step="1" value={draft} placeholder="0" onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>;
 }
 
 function Settlements({ state, onSale }: { state: LootState; onSale: () => void }) {
@@ -466,7 +501,8 @@ function MemberSearch({ state }: { state: LootState }) {
         paidLoot.set(key, current);
       });
       const totalPaid = matchingSales.reduce((total, sale) => total + (sale.recipientAmounts?.[member.id] ?? sale.salaryEach), 0);
-      return { member, memberMatches, pendingLoot: [...pendingLoot.values()], paidLoot: [...paidLoot.values()], totalPaid };
+      const estimatedPendingSalary = estimatedPendingSalaryForMember(state, member.id, memberMatches ? undefined : normalizedQuery);
+      return { member, memberMatches, pendingLoot: [...pendingLoot.values()], paidLoot: [...paidLoot.values()], totalPaid, estimatedPendingSalary };
     }).filter((result) => result.memberMatches || result.pendingLoot.length > 0 || result.paidLoot.length > 0)
       .sort((left, right) => {
         const leftOrder = payoutOrder.indexOf(left.member.id);
@@ -479,7 +515,7 @@ function MemberSearch({ state }: { state: LootState }) {
   return <>
     <PageTitle eyebrow="MEMBER LEDGER" title="Search members & loot" text="Find pending loot, paid loot, and the total amount paid to each member." />
     <div className="member-search-bar"><Search size={20} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a member or loot item..." />{query && <button aria-label="Clear search" onClick={() => setQuery("")}><X size={16} /></button>}</div>
-    {!normalizedQuery ? <div className="search-welcome"><Search size={28} /><h2>Search the guild ledger</h2><p>Enter a member name or an item such as Sunstone.</p></div> : results.length === 0 ? <div className="search-welcome"><Search size={28} /><h2>No matching records</h2><p>Try another member or loot item name.</p></div> : <><div className="search-result-count">{results.length} {results.length === 1 ? "member" : "members"} found</div><div className="member-results">{results.map(({ member, pendingLoot, paidLoot, totalPaid }) => <article className="member-result" key={member.id}><div className="member-result-person"><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><div><strong>{member.name}</strong><small>{pendingLoot.length > 0 ? "Waiting for loot sale" : paidLoot.length > 0 ? "Paid loot recorded" : "No matching loot"}</small></div></div><div className="member-pending-loot"><span>Pending loot</span><div>{pendingLoot.length > 0 ? pendingLoot.map((loot) => <b key={loot.name}>{loot.quantity.toLocaleString()} × {loot.name}</b>) : <em>None awaiting sale</em>}</div></div><div className="member-paid-loot"><span>Paid loot</span><div>{paidLoot.length > 0 ? paidLoot.map((loot) => <b key={loot.name}>{loot.name}{loot.sales > 1 ? ` · ${loot.sales} sales` : ""}</b>) : <em>No paid loot</em>}</div></div><div className="member-total-paid"><span>Total paid</span><strong>{peso.format(totalPaid)}</strong></div></article>)}</div></>}
+    {!normalizedQuery ? <div className="search-welcome"><Search size={28} /><h2>Search the guild ledger</h2><p>Enter a member name or an item such as Sunstone.</p></div> : results.length === 0 ? <div className="search-welcome"><Search size={28} /><h2>No matching records</h2><p>Try another member or loot item name.</p></div> : <><div className="search-result-count">{results.length} {results.length === 1 ? "member" : "members"} found</div><div className="member-results">{results.map(({ member, pendingLoot, paidLoot, totalPaid, estimatedPendingSalary }) => <article className="member-result" key={member.id}><div className="member-result-person"><span className="avatar">{member.name.slice(0, 2).toUpperCase()}</span><div><strong>{member.name}</strong><small>{pendingLoot.length > 0 ? "Waiting for loot sale" : paidLoot.length > 0 ? "Paid loot recorded" : "No matching loot"}</small></div></div><div className="member-pending-loot"><span>Pending loot</span><div>{pendingLoot.length > 0 ? pendingLoot.map((loot) => <b key={loot.name}>{loot.quantity.toLocaleString()} × {loot.name}</b>) : <em>None awaiting sale</em>}</div></div><div className="member-paid-loot"><span>Paid loot</span><div>{paidLoot.length > 0 ? paidLoot.map((loot) => <b key={loot.name}>{loot.name}{loot.sales > 1 ? ` · ${loot.sales} sales` : ""}</b>) : <em>No paid loot</em>}</div></div><div className="member-payment-summary"><span>Est. pending salary</span><strong>{peso.format(estimatedPendingSalary)}</strong><span>Total paid</span><strong>{peso.format(totalPaid)}</strong></div></article>)}</div></>}
   </>;
 }
 
@@ -570,7 +606,7 @@ function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: 
   const [lootName, setLootName] = useState(initialLootName);
   const stock = available.find((item) => item.name === lootName);
   const [quantity, setQuantity] = useState(initialQuantity);
-  const [unitPrice, setUnitPrice] = useState(0);
+  const [unitPrice, setUnitPrice] = useState(available[0]?.vendingAmount ?? 0);
   const eligibleIds = useMemo(() => eligibleMembersForSale(state, lootName, quantity), [state, lootName, quantity]);
   const [recipients, setRecipients] = useState<string[]>(() => eligibleMembersForSale(state, initialLootName, initialQuantity));
   const [mailRecipientId, setMailRecipientId] = useState(recipients[0] ?? "");
@@ -579,6 +615,7 @@ function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: 
     const nextQuantity = available.find((item) => item.name === name)?.available ?? 1;
     setLootName(name);
     setQuantity(nextQuantity);
+    setUnitPrice(available.find((item) => item.name === name)?.vendingAmount ?? 0);
     setRecipients(eligibleMembersForSale(state, name, nextQuantity));
   };
   const selectQuantity = (nextQuantity: number) => {

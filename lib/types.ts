@@ -43,6 +43,7 @@ export type LootState = {
   members: Member[];
   runs: DungeonRun[];
   sales: Sale[];
+  vendingPrices: Record<string, number>;
   payoutQueue: string[];
   auditLog: AuditEntry[];
   lastUpdatedBy?: string;

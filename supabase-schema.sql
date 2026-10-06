@@ -1,4 +1,24 @@
 -- Relational migration. Keeps stoics_loot_state as a rollback snapshot and imports it once.
+create extension if not exists pgcrypto;
+
+create table if not exists public.manager_users (
+  id uuid primary key default gen_random_uuid(),
+  username text not null check (char_length(trim(username)) between 2 and 32),
+  username_key text generated always as (lower(trim(username))) stored unique,
+  password_hash text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  last_login_at timestamptz,
+  login_count bigint not null default 0
+);
+create table if not exists public.manager_login_log (
+  id bigint generated always as identity primary key,
+  manager_user_id uuid not null references public.manager_users(id) on delete cascade,
+  username text not null,
+  logged_in_at timestamptz not null default now()
+);
+
 create table if not exists public.members (id text primary key, name text not null, active boolean not null default true, sort_order integer not null default 0);
 create table if not exists public.dungeon_runs (id text primary key, dungeon text not null, created_at timestamptz not null, created_by text not null, sort_order integer not null default 0);
 create table if not exists public.run_members (run_id text not null references public.dungeon_runs(id) on delete cascade, member_id text not null references public.members(id), position integer not null, primary key (run_id, member_id));
@@ -101,6 +121,34 @@ begin
 end;
 $$;
 
+create or replace function public.authenticate_stoics_manager(p_username text, p_password text) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  account public.manager_users%rowtype;
+  accounts_configured boolean;
+begin
+  select exists(select 1 from public.manager_users) into accounts_configured;
+  select * into account from public.manager_users where username_key=lower(trim(p_username)) limit 1;
+  if not found or not account.active or account.password_hash<>crypt(coalesce(p_password,''),account.password_hash) then
+    return jsonb_build_object('authenticated',false,'configured',accounts_configured);
+  end if;
+  update public.manager_users set last_login_at=now(),login_count=login_count+1 where id=account.id;
+  insert into public.manager_login_log (manager_user_id,username) values (account.id,account.username);
+  return jsonb_build_object('authenticated',true,'configured',true,'username',account.username);
+end;
+$$;
+
+-- Run this separately in the Supabase SQL editor after applying the schema:
+-- select public.set_stoics_manager_password('stoics-admin', 'replace-with-a-strong-password');
+create or replace function public.set_stoics_manager_password(p_username text, p_password text) returns void language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if char_length(trim(p_username)) not between 2 and 32 then raise exception 'Username must be between 2 and 32 characters'; end if;
+  if char_length(p_password) not between 8 and 128 then raise exception 'Password must be between 8 and 128 characters'; end if;
+  insert into public.manager_users (username,password_hash)
+  values (trim(p_username),crypt(p_password,gen_salt('bf',12)))
+  on conflict (username_key) do update set username=excluded.username,password_hash=excluded.password_hash,active=true,updated_at=now();
+end;
+$$;
+
 do $$ declare legacy_state jsonb; begin
   if to_regclass('public.stoics_loot_state') is not null and not exists (select 1 from public.members) then
     execute 'select payload from public.stoics_loot_state where id = ''guild''' into legacy_state;
@@ -109,11 +157,15 @@ do $$ declare legacy_state jsonb; begin
 end $$;
 
 alter table public.members enable row level security; alter table public.dungeon_runs enable row level security;
+alter table public.manager_users enable row level security; alter table public.manager_login_log enable row level security;
 alter table public.run_members enable row level security; alter table public.loot_items enable row level security;
 alter table public.run_loot enable row level security; alter table public.sales enable row level security;
 alter table public.sale_recipients enable row level security; alter table public.sale_allocations enable row level security;
 alter table public.payout_queue enable row level security; alter table public.audit_log enable row level security;
 alter table public.ledger_metadata enable row level security;
 revoke all on public.members,public.dungeon_runs,public.run_members,public.loot_items,public.run_loot,public.sales,public.sale_recipients,public.sale_allocations,public.payout_queue,public.audit_log,public.ledger_metadata from anon,authenticated;
+revoke all on public.manager_users,public.manager_login_log from anon,authenticated;
+revoke all on function public.set_stoics_manager_password(text,text) from public,anon,authenticated;
 grant execute on function public.get_stoics_loot_state() to anon,authenticated;
 grant execute on function public.save_stoics_loot_state(jsonb,text) to anon,authenticated;
+grant execute on function public.authenticate_stoics_manager(text,text) to anon,authenticated;

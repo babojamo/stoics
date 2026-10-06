@@ -117,39 +117,46 @@ function recordedPayouts(sale: Sale) {
 }
 
 function memberNameKey(name: string) {
-  return name.trim().toLowerCase().replace(/[il1|]/g, "i").replace(/[^a-z0-9]/g, "");
+  return name.normalize("NFKC").trim().toLowerCase().replace(/[il1|]/g, "i").replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 function recognizedNames(text: string) {
   const blocked = /^(party|member|leader|level|guild|hp|mp|flyff|universe|invite|leave)$/i;
   return text.split(/\r?\n/)
-    .map((line) => line.trim().replace(/[^a-zA-Z0-9_\- ]/g, ""))
+    .map((line) => line.normalize("NFKC").trim().replace(/[^\p{L}\p{N}_\- ]/gu, "").replace(/\s+/g, ""))
     .filter((line) => line.length >= 3 && line.length <= 22 && !blocked.test(line) && !/^\d+$/.test(line));
 }
 
-function mergeNameReadings(first: string[], second: string[]) {
-  const scores = Array.from({ length: first.length + 1 }, () => Array(second.length + 1).fill(0));
-  for (let left = first.length - 1; left >= 0; left -= 1) {
-    for (let right = second.length - 1; right >= 0; right -= 1) {
-      scores[left][right] = memberNameKey(first[left]) === memberNameKey(second[right])
-        ? scores[left + 1][right + 1] + 1
-        : Math.max(scores[left + 1][right], scores[left][right + 1]);
+function nameDistance(left: string, right: string) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let diagonal = previous[0];
+    previous[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const above = previous[rightIndex];
+      previous[rightIndex] = left[leftIndex - 1] === right[rightIndex - 1]
+        ? diagonal
+        : Math.min(diagonal, previous[rightIndex - 1], above) + 1;
+      diagonal = above;
     }
   }
+  return previous[right.length];
+}
+
+function namesAreSimilar(left: string, right: string) {
+  const first = memberNameKey(left);
+  const second = memberNameKey(right);
+  if (!first || !second) return false;
+  const allowedChanges = Math.max(1, Math.floor(Math.max(first.length, second.length) * .24));
+  return nameDistance(first, second) <= allowedChanges;
+}
+
+function mergeNameReadings(original: string[], enhanced: string[]) {
   const merged: string[] = [];
-  let left = 0;
-  let right = 0;
-  while (left < first.length && right < second.length) {
-    if (memberNameKey(first[left]) === memberNameKey(second[right])) {
-      merged.push(first[left]); left += 1; right += 1;
-    } else if (scores[left + 1][right] >= scores[left][right + 1]) {
-      merged.push(first[left]); left += 1;
-    } else {
-      merged.push(second[right]); right += 1;
-    }
+  for (const name of [...original, ...enhanced]) {
+    if (!merged.some((candidate) => namesAreSimilar(candidate, name))) merged.push(name);
   }
-  merged.push(...first.slice(left), ...second.slice(right));
-  return merged.filter((name, index) => merged.findIndex((candidate) => memberNameKey(candidate) === memberNameKey(name)) === index).slice(0, 8);
+  return merged.slice(0, 8);
 }
 
 async function preparePartyImage(file: File): Promise<Blob> {
@@ -369,16 +376,21 @@ function RunModal({ state, run, currentUser, onClose, onSave }: { state: LootSta
   const [loots, setLoots] = useState<RunLoot[]>(run ? run.loots.map((loot) => ({ ...loot })) : [{ id: makeId(), name: "", quantity: 1 }]);
   const [reading, setReading] = useState(false);
   const [ocrNote, setOcrNote] = useState("Paste a party screenshot or choose an image.");
+  const [imagePreview, setImagePreview] = useState("");
+  const previewUrlRef = useRef("");
   const fileRef = useRef<HTMLInputElement>(null);
   const suggestions = [...new Set(state.runs.flatMap((run) => run.loots.map((loot) => loot.name)))];
 
   const readImage = async (file: File) => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = URL.createObjectURL(file);
+    setImagePreview(previewUrlRef.current);
     setReading(true); setOcrNote("Reading names from screenshot…");
     try {
       const { createWorker } = await import("tesseract.js");
       const preparedImage = await preparePartyImage(file);
       let pass = "original";
-      const worker = await createWorker("eng", undefined, { logger: (message) => { if (message.status === "recognizing text") setOcrNote(`Reading ${pass} image… ${Math.round((message.progress ?? 0) * 100)}%`); } });
+      const worker = await createWorker(["eng", "tha"], undefined, { logger: (message) => { if (message.status === "recognizing text") setOcrNote(`Reading ${pass} image… ${Math.round((message.progress ?? 0) * 100)}%`); } });
       let originalText = "";
       let enhancedText = "";
       try {
@@ -409,6 +421,8 @@ function RunModal({ state, run, currentUser, onClose, onSave }: { state: LootSta
     window.addEventListener("paste", paste); return () => window.removeEventListener("paste", paste);
   });
 
+  useEffect(() => () => { if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current); }, []);
+
   const addMember = () => { const member = { id: makeId(), name: "", active: true }; setMembers((current) => [...current, member]); setSelected((current) => [...current, member.id]); };
   const save = () => {
     const cleanLoots = loots.filter((loot) => loot.name.trim() && loot.quantity > 0);
@@ -427,7 +441,7 @@ function RunModal({ state, run, currentUser, onClose, onSave }: { state: LootSta
     onSave({ ...state, members: mergedMembers, runs, payoutQueue: [...state.payoutQueue, ...newMembers.map((member) => member.id).filter((id) => !state.payoutQueue.includes(id))] });
   };
 
-  return <Modal title={run ? "Edit dungeon run" : "Log a dungeon run"} subtitle={run ? "Update the dungeon, party roster, or recorded loot." : "Import the party, confirm the roster, then record every drop."} onClose={onClose}><div className="modal-scroll"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Dungeon & party screenshot</strong><small>OCR will read names only after you add a screenshot.</small></div></div><label className="field">Dungeon name<input value={dungeon} onChange={(e) => setDungeon(e.target.value)} /></label><button className={`dropzone ${reading ? "reading" : ""}`} onClick={() => fileRef.current?.click()}><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0])} />{reading ? <LoaderCircle className="spin" /> : <ImagePlus />}<strong>{ocrNote}</strong><span>PNG or JPG · You can also press Ctrl+V</span></button></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Confirm party members</strong><small>{run ? "Add, remove, or correct members in this saved party." : "No members are prefilled. Import a screenshot or add them manually."}</small></div></div><datalist id="member-suggestions">{state.members.map((member) => <option value={member.name} key={member.id} />)}</datalist><div className="member-editor">{members.map((member) => <div key={member.id} className={selected.includes(member.id) ? "member-edit selected" : "member-edit"}><button onClick={() => setSelected((current) => current.includes(member.id) ? current.filter((id) => id !== member.id) : [...current, member.id])}>{selected.includes(member.id) && <Check size={13} />}</button><input list="member-suggestions" value={member.name} placeholder="Start typing a saved member name" onChange={(e) => setMembers((current) => current.map((m) => m.id === member.id ? { ...m, name: e.target.value } : m))} /><button className="remove" onClick={() => { setMembers((current) => current.filter((m) => m.id !== member.id)); setSelected((current) => current.filter((id) => id !== member.id)); }}><X size={14} /></button></div>)}</div><button className="text-button add-member" onClick={addMember}><Plus size={15} /> Add member manually</button></section><section className="form-section"><div className="section-label"><span>3</span><div><strong>Add loot</strong><small>Suggestions learn from previously saved loot names.</small></div></div><datalist id="loot-suggestions">{suggestions.map((name) => <option value={name} key={name} />)}</datalist><div className="loot-editor"><div className="loot-head"><span>Loot name</span><span>Quantity</span></div>{loots.map((loot) => <div className="loot-edit-row" key={loot.id}><input list="loot-suggestions" value={loot.name} placeholder="e.g. Sunstone" onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, name: e.target.value } : item))} /><input type="number" min="1" value={loot.quantity} onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, quantity: Number(e.target.value) } : item))} /><button className="icon-button" onClick={() => setLoots((current) => current.filter((item) => item.id !== loot.id))}><Trash2 size={15} /></button></div>)}</div><button className="text-button" onClick={() => setLoots((current) => [...current, { id: makeId(), name: "", quantity: 1 }])}><Plus size={15} /> Add another loot</button></section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" onClick={save}><Check size={16} /> {run ? "Save changes" : "Save dungeon run"}</button></div></Modal>;
+  return <Modal title={run ? "Edit dungeon run" : "Log a dungeon run"} subtitle={run ? "Update the dungeon, party roster, or recorded loot." : "Import the party, confirm the roster, then record every drop."} onClose={onClose}><div className="modal-scroll"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Dungeon & party screenshot</strong><small>OCR will read names only after you add a screenshot.</small></div></div><label className="field">Dungeon name<input value={dungeon} onChange={(e) => setDungeon(e.target.value)} /></label><button className={`dropzone ${reading ? "reading" : ""} ${imagePreview ? "has-preview" : ""}`} onClick={() => fileRef.current?.click()}><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0])} />{imagePreview ? <img className="party-preview" src={imagePreview} alt="Party screenshot preview" /> : reading ? <LoaderCircle className="spin" /> : <ImagePlus />}<span className="dropzone-status">{reading && imagePreview && <LoaderCircle className="spin" size={15} />}<strong>{ocrNote}</strong><small>PNG or JPG · You can also press Ctrl+V</small></span></button></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Confirm party members</strong><small>{run ? "Add, remove, or correct members in this saved party." : "No members are prefilled. Import a screenshot or add them manually."}</small></div></div><datalist id="member-suggestions">{state.members.map((member) => <option value={member.name} key={member.id} />)}</datalist><div className="member-editor">{members.map((member) => <div key={member.id} className={selected.includes(member.id) ? "member-edit selected" : "member-edit"}><button onClick={() => setSelected((current) => current.includes(member.id) ? current.filter((id) => id !== member.id) : [...current, member.id])}>{selected.includes(member.id) && <Check size={13} />}</button><input list="member-suggestions" value={member.name} placeholder="Start typing a saved member name" onChange={(e) => setMembers((current) => current.map((m) => m.id === member.id ? { ...m, name: e.target.value } : m))} /><button className="remove" onClick={() => { setMembers((current) => current.filter((m) => m.id !== member.id)); setSelected((current) => current.filter((id) => id !== member.id)); }}><X size={14} /></button></div>)}</div><button className="text-button add-member" onClick={addMember}><Plus size={15} /> Add member manually</button></section><section className="form-section"><div className="section-label"><span>3</span><div><strong>Add loot</strong><small>Suggestions learn from previously saved loot names.</small></div></div><datalist id="loot-suggestions">{suggestions.map((name) => <option value={name} key={name} />)}</datalist><div className="loot-editor"><div className="loot-head"><span>Loot name</span><span>Quantity</span></div>{loots.map((loot) => <div className="loot-edit-row" key={loot.id}><input list="loot-suggestions" value={loot.name} placeholder="e.g. Sunstone" onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, name: e.target.value } : item))} /><input type="number" min="1" value={loot.quantity} onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, quantity: Number(e.target.value) } : item))} /><button className="icon-button" onClick={() => setLoots((current) => current.filter((item) => item.id !== loot.id))}><Trash2 size={15} /></button></div>)}</div><button className="text-button" onClick={() => setLoots((current) => [...current, { id: makeId(), name: "", quantity: 1 }])}><Plus size={15} /> Add another loot</button></section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" onClick={save}><Check size={16} /> {run ? "Save changes" : "Save dungeon run"}</button></div></Modal>;
 }
 
 function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: LootState; inventory: ReturnType<typeof inventoryFor>; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {

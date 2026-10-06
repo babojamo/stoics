@@ -1,5 +1,6 @@
 -- Relational migration. Keeps stoics_loot_state as a rollback snapshot and imports it once.
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.manager_users (
   id uuid primary key default gen_random_uuid(),
@@ -128,7 +129,7 @@ declare
 begin
   select exists(select 1 from public.manager_users) into accounts_configured;
   select * into account from public.manager_users where username_key=lower(trim(p_username)) limit 1;
-  if not found or not account.active or account.password_hash<>crypt(coalesce(p_password,''),account.password_hash) then
+  if not found or not account.active or account.password_hash<>extensions.crypt(coalesce(p_password,''),account.password_hash) then
     return jsonb_build_object('authenticated',false,'configured',accounts_configured);
   end if;
   update public.manager_users set last_login_at=now(),login_count=login_count+1 where id=account.id;
@@ -144,7 +145,7 @@ begin
   if char_length(trim(p_username)) not between 2 and 32 then raise exception 'Username must be between 2 and 32 characters'; end if;
   if char_length(p_password) not between 8 and 128 then raise exception 'Password must be between 8 and 128 characters'; end if;
   insert into public.manager_users (username,password_hash)
-  values (trim(p_username),crypt(p_password,gen_salt('bf',12)))
+  values (trim(p_username),extensions.crypt(p_password,extensions.gen_salt('bf',12)))
   on conflict (username_key) do update set username=excluded.username,password_hash=excluded.password_hash,active=true,updated_at=now();
 end;
 $$;

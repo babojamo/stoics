@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
   Archive,
   Check,
@@ -384,7 +383,7 @@ export default function Home() {
 function Login({ credentials, setCredentials, submit, busy, error }: { credentials: { username: string; password: string }; setCredentials: React.Dispatch<React.SetStateAction<{ username: string; password: string }>>; submit: (event: React.FormEvent) => void; busy: boolean; error: string }) {
   return <main className="login-page">
     <section className="login-visual"><div className="visual-glow" /><Logo /><div className="login-copy"><span className="eyebrow">DUNGEON OPERATIONS</span><h1>Every drop tracked.<br />Every member paid.</h1><p>Turn party screenshots into a clean loot ledger, then settle every sale with a fair, transparent payout queue.</p></div><div className="loot-orbit one"><Gem size={28} /></div><div className="loot-orbit two"><Coins size={24} /></div></section>
-    <section className="login-panel"><form onSubmit={submit} className="login-card"><span className="login-icon"><ShieldCheck size={24} /></span><h2>Manager access</h2><p>Use your own username for update attribution, then enter the shared manager password.</p><label>Username<input autoFocus value={credentials.username} onChange={(e) => setCredentials((c) => ({ ...c, username: e.target.value }))} placeholder="Enter your username" /></label><label>Manager password<input type="password" value={credentials.password} onChange={(e) => setCredentials((c) => ({ ...c, password: e.target.value }))} placeholder="Enter manager password" /></label>{error && <div className="form-error">{error}</div>}<button className="primary login-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}{busy ? "Checking…" : "Enter loot ledger"}</button><Link className="public-inquiries-link" href="/inquiries"><Search size={15} /> Open public inquiries</Link><small>Session secured with an HTTP-only cookie · Password controlled by the environment</small></form></section>
+    <section className="login-panel"><form onSubmit={submit} className="login-card"><span className="login-icon"><ShieldCheck size={24} /></span><h2>Manager access</h2><p>Use your own username for update attribution, then enter the shared manager password.</p><label>Username<input autoFocus value={credentials.username} onChange={(e) => setCredentials((c) => ({ ...c, username: e.target.value }))} placeholder="Enter your username" /></label><label>Manager password<input type="password" value={credentials.password} onChange={(e) => setCredentials((c) => ({ ...c, password: e.target.value }))} placeholder="Enter manager password" /></label>{error && <div className="form-error">{error}</div>}<button className="primary login-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}{busy ? "Checking…" : "Enter loot ledger"}</button><button type="button" className="public-inquiries-link" onClick={() => window.location.assign("/inquiries")}><Search size={15} /> Open public inquiries</button><small>Session secured with an HTTP-only cookie · Password controlled by the environment</small></form></section>
   </main>;
 }
 

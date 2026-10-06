@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { LoaderCircle, Search, ShieldCheck, X } from "lucide-react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 type InquiryResult = {
@@ -52,8 +51,10 @@ export default function InquiriesPage() {
     if (!value.trim()) { setResults([]); setError(""); setLoading(false); }
   };
 
+  const openManagerLogin = () => window.location.assign("/");
+
   return <main className="public-inquiries">
-    <header className="public-inquiries-header"><Link className="public-brand" href="/"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>LOOT LEDGER</small></div></Link><Link className="manager-link" href="/"><ShieldCheck size={16} /> Manager login</Link></header>
+    <header className="public-inquiries-header"><button type="button" className="public-brand" onClick={openManagerLogin} aria-label="Open Stoics Loot Ledger manager login"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>LOOT LEDGER</small></div></button><button type="button" className="manager-link" onClick={openManagerLogin}><ShieldCheck size={16} /> Manager login</button></header>
     <section className="public-inquiries-content">
       <div className="public-title"><span>PUBLIC INQUIRIES</span><h1>Search members & loot</h1><p>Review pending loot, paid loot, and the total amount paid to each member.</p></div>
       <div className="member-search-bar public-search"><Search size={20} /><input autoFocus value={query} onChange={(event) => updateQuery(event.target.value)} placeholder="Search a member or loot item..." />{loading ? <LoaderCircle className="spin" size={18} /> : query && <button aria-label="Clear search" onClick={() => updateQuery("")}><X size={16} /></button>}</div>

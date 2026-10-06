@@ -81,6 +81,44 @@ function eligibleMembersForSale(state: LootState, lootName: string, quantity: nu
   ];
 }
 
+function memberNameKey(name: string) {
+  return name.trim().toLowerCase().replace(/[il1|]/g, "i").replace(/[^a-z0-9]/g, "");
+}
+
+async function preparePartyImage(file: File): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const source = document.createElement("canvas");
+    source.width = bitmap.width;
+    source.height = bitmap.height;
+    const sourceContext = source.getContext("2d", { willReadFrequently: true });
+    if (!sourceContext) return file;
+    sourceContext.drawImage(bitmap, 0, 0);
+    const pixels = sourceContext.getImageData(0, 0, source.width, source.height);
+    for (let index = 0; index < pixels.data.length; index += 4) {
+      const peak = Math.max(pixels.data[index], pixels.data[index + 1], pixels.data[index + 2]);
+      const value = peak > 24 ? 0 : 255;
+      pixels.data[index] = value;
+      pixels.data[index + 1] = value;
+      pixels.data[index + 2] = value;
+      pixels.data[index + 3] = 255;
+    }
+    sourceContext.putImageData(pixels, 0, 0);
+    bitmap.close();
+
+    const output = document.createElement("canvas");
+    output.width = source.width * 3;
+    output.height = source.height * 3;
+    const outputContext = output.getContext("2d");
+    if (!outputContext) return file;
+    outputContext.imageSmoothingEnabled = false;
+    outputContext.drawImage(source, 0, 0, output.width, output.height);
+    return await new Promise<Blob>((resolve, reject) => output.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Image preparation failed")), "image/png"));
+  } catch {
+    return file;
+  }
+}
+
 function Logo() {
   return <div className="brand"><span className="brand-mark"><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>LOOT LEDGER</small></div></div>;
 }
@@ -265,17 +303,20 @@ function RunModal({ state, currentUser, onClose, onSave }: { state: LootState; c
     setReading(true); setOcrNote("Reading names from screenshot…");
     try {
       const { recognize } = await import("tesseract.js");
-      const result = await recognize(file, "eng", { logger: (message) => { if (message.status === "recognizing text") setOcrNote(`Reading names… ${Math.round((message.progress ?? 0) * 100)}%`); } });
+      const preparedImage = await preparePartyImage(file);
+      const result = await recognize(preparedImage, "eng", { logger: (message) => { if (message.status === "recognizing text") setOcrNote(`Reading names… ${Math.round((message.progress ?? 0) * 100)}%`); } });
       const blocked = /^(party|member|leader|level|guild|hp|mp|flyff|universe|invite|leave)$/i;
       const names = result.data.text.split(/\r?\n/).map((line) => line.trim().replace(/[^a-zA-Z0-9_\- ]/g, "")).filter((line) => line.length >= 3 && line.length <= 22 && !blocked.test(line) && !/^\d+$/.test(line)).slice(0, 8);
       if (!names.length) { setOcrNote("No clear names found. Add them manually below."); return; }
       const nextMembers = [...members];
       const nextSelected: string[] = [];
       names.forEach((name) => {
-        let member = nextMembers.find((m) => m.name.toLowerCase() === name.toLowerCase())
-          ?? state.members.find((m) => m.name.toLowerCase() === name.toLowerCase());
-        if (!member) { member = { id: makeId(), name, active: true }; nextMembers.push(member); }
-        nextSelected.push(member.id);
+        const key = memberNameKey(name);
+        let member = nextMembers.find((m) => memberNameKey(m.name) === key)
+          ?? state.members.find((m) => memberNameKey(m.name) === key);
+        if (!member) member = { id: makeId(), name, active: true };
+        if (!nextMembers.some((candidate) => candidate.id === member.id)) nextMembers.push(member);
+        if (!nextSelected.includes(member.id)) nextSelected.push(member.id);
       });
       setMembers(nextMembers); setSelected(nextSelected); setOcrNote(`${names.length} names found. Review them before saving.`);
     } catch { setOcrNote("Could not read that image. Add party names manually."); } finally { setReading(false); }

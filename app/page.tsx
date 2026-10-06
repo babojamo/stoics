@@ -444,17 +444,32 @@ function Metric({ icon, tone, label, value, note }: { icon: React.ReactNode; ton
 
 function Runs({ state, onChange, onRun, onEdit }: { state: LootState; onChange: (next: LootState, action?: string) => void; onRun: () => void; onEdit: (run: DungeonRun) => void }) {
   const [pendingDelete, setPendingDelete] = useState<DungeonRun | null>(null);
+  const [query, setQuery] = useState("");
+  const [runDate, setRunDate] = useState("");
   const soldByLoot = useMemo(() => soldQuantitiesByRunLoot(state), [state]);
   const runHasSales = (run: DungeonRun) => run.loots.some((loot) => (soldByLoot.get(`${run.id}:${loot.id}`) ?? 0) > 0);
+  const shownRuns = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    return state.runs.filter((run) => {
+      const createdAt = new Date(run.createdAt);
+      const localDate = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(createdAt.getDate()).padStart(2, "0")}`;
+      if (runDate && localDate !== runDate) return false;
+      if (!needle) return true;
+      const memberNames = run.memberIds.map((id) => state.members.find((member) => member.id === id)?.name ?? "");
+      return [run.dungeon, ...run.loots.map((loot) => loot.name), ...memberNames]
+        .some((value) => value.toLocaleLowerCase().includes(needle));
+    });
+  }, [query, runDate, state.members, state.runs]);
+  const filtersActive = Boolean(query.trim() || runDate);
   const removeRun = () => {
     if (!pendingDelete || runHasSales(pendingDelete)) return;
     onChange({ ...state, runs: state.runs.filter((run) => run.id !== pendingDelete.id) }, `Deleted ${pendingDelete.dungeon}`);
     setPendingDelete(null);
   };
-  return <><PageTitle eyebrow="RUN HISTORY" title="Dungeon runs" text="Review each party and see which loot has already been sold." action={<button className="primary" onClick={onRun}><Plus size={17} /> Add dungeon run</button>} /><div className="run-stack">{state.runs.map((run) => {
+  return <><PageTitle eyebrow="RUN HISTORY" title="Dungeon runs" text="Review each party and see which loot has already been sold." action={<button className="primary" onClick={onRun}><Plus size={17} /> Add dungeon run</button>} /><div className="run-filter-bar"><div className="run-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search run, loot, or member…" aria-label="Search dungeon runs" />{query && <button type="button" onClick={() => setQuery("")} aria-label="Clear run search"><X size={15} /></button>}</div><label className="run-date-filter"><span>Date</span><input type="date" value={runDate} onChange={(event) => setRunDate(event.target.value)} aria-label="Filter dungeon runs by date" /></label>{filtersActive && <button type="button" className="clear-run-filters" onClick={() => { setQuery(""); setRunDate(""); }}><X size={14} /> Clear filters</button>}<span className="run-result-count">{shownRuns.length} of {state.runs.length} runs</span></div>{shownRuns.length === 0 ? <div className="empty run-filter-empty"><span><Search size={26} /></span><h2>No dungeon runs found</h2><p>Try another run, loot, member, or date.</p>{filtersActive && <button type="button" className="secondary" onClick={() => { setQuery(""); setRunDate(""); }}>Clear filters</button>}</div> : <div className="run-stack">{shownRuns.map((run) => {
     const locked = runHasSales(run);
     return <article className={`run-card ${locked ? "locked" : ""}`} key={run.id}><div className="run-date"><strong>{new Date(run.createdAt).getDate()}</strong><span>{new Date(run.createdAt).toLocaleString("en", { month: "short" })}</span></div><div className="run-main"><div className="run-title"><div><div className="run-heading"><h2>{run.dungeon}</h2>{locked && <span className="run-locked"><Lock size={11} /> Sale recorded · Run locked</span>}</div><span>{dateTime.format(new Date(run.createdAt))} · Added by {run.createdBy ?? "Unknown"}</span></div><div className="run-actions"><button className="icon-button" disabled={locked} title={locked ? "This run cannot be edited because some loot has been sold" : "Edit run"} aria-label={`Edit ${run.dungeon}`} onClick={() => onEdit(run)}><Pencil size={15} /></button><button className="icon-button danger" disabled={locked} title={locked ? "This run cannot be deleted because some loot has been sold" : "Delete run"} aria-label={`Delete ${run.dungeon}`} onClick={() => setPendingDelete(run)}><Trash2 size={16} /></button></div></div><div className="run-section"><label>Party</label><div className="chips">{run.memberIds.map((id) => <span className="member-chip" key={id}>{state.members.find((m) => m.id === id)?.name ?? "Unknown"}</span>)}</div></div><div className="run-section"><label>Loot</label><div className="loot-grid">{run.loots.map((loot) => <EditableLoot key={loot.id} loot={loot} soldQuantity={soldByLoot.get(`${run.id}:${loot.id}`) ?? 0} locked={locked} onChange={(updated) => onChange({ ...state, runs: state.runs.map((candidate) => candidate.id === run.id ? { ...candidate, loots: candidate.loots.map((entry) => entry.id === loot.id ? updated : entry) } : candidate) }, `Edited ${loot.name || "a loot item"}`)} />)}</div></div></div></article>;
-  })}</div>{pendingDelete && <ConfirmModal title="Delete dungeon run?" text={`Delete ${pendingDelete.dungeon} and its party and loot record? This can change inventory totals and future salary eligibility.`} onCancel={() => setPendingDelete(null)} onConfirm={removeRun} />}</>;
+  })}</div>}{pendingDelete && <ConfirmModal title="Delete dungeon run?" text={`Delete ${pendingDelete.dungeon} and its party and loot record? This can change inventory totals and future salary eligibility.`} onCancel={() => setPendingDelete(null)} onConfirm={removeRun} />}</>;
 }
 
 function EditableLoot({ loot, soldQuantity, locked, onChange }: { loot: RunLoot; soldQuantity: number; locked: boolean; onChange: (loot: RunLoot) => void }) {

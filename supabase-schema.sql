@@ -55,7 +55,7 @@ begin
   where exists (select 1 from public.members m where m.id=member.value);
 
   insert into public.loot_items (id,name,vending_price)
-  select 'loot_'||md5(canonical_name),display_name,coalesce((select nullif(price.value,'')::numeric from jsonb_each_text(coalesce(p_state->'vendingPrices','{}'::jsonb)) price where lower(trim(price.key))=canonical_name limit 1),0) from (
+  select 'loot_'||md5(canonical_name),display_name,coalesce((select nullif(price.value,'')::numeric from jsonb_each_text(coalesce(p_state->'vendingPrices','{}'::jsonb)) price where lower(trim(price.key))=canonical_name order by (trim(price.key)=canonical_name) desc,price.key desc limit 1),0) from (
     select distinct on (lower(trim(name))) lower(trim(name)) canonical_name,trim(name) display_name from (
       select loot.value->>'name' name from jsonb_array_elements(coalesce(p_state->'runs','[]'::jsonb)) r(value) cross join lateral jsonb_array_elements(coalesce(r.value->'loots','[]'::jsonb)) loot(value)
       union all select s.value->>'lootName' from jsonb_array_elements(coalesce(p_state->'sales','[]'::jsonb)) s(value)

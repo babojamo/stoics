@@ -2,6 +2,7 @@ import { getSessionUser } from "../../../lib/auth-server";
 import { defaultState } from "../../../lib/default-state";
 import type { LootState } from "../../../lib/types";
 import { getRuntimeEnv } from "../../../lib/runtime-env";
+import { normalizeVendingPrices } from "../../../lib/vending-prices";
 
 const rowId = "guild";
 
@@ -23,7 +24,7 @@ function normalizeState(value: Partial<LootState> | null | undefined): LootState
     members: value?.members ?? [],
     runs: value?.runs ?? [],
     sales: value?.sales ?? [],
-    vendingPrices: value?.vendingPrices ?? {},
+    vendingPrices: normalizeVendingPrices(value?.vendingPrices),
     payoutQueue: value?.payoutQueue ?? [],
     auditLog: value?.auditLog ?? [],
     lastUpdatedBy: value?.lastUpdatedBy,
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   const username = await getSessionUser(request);
   if (!username) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const state = (await request.json()) as LootState;
+  const state = normalizeState((await request.json()) as LootState);
   state.lastUpdatedBy = username;
   state.lastUpdatedAt = new Date().toISOString();
   if (state.auditLog?.[0]) state.auditLog[0].username = username;

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { defaultState } from "../lib/default-state";
 import type { DungeonRun, LootState, Member, RunLoot, Sale } from "../lib/types";
+import { normalizeVendingPrices, setVendingPrice } from "../lib/vending-prices";
 
 type Tab = "dashboard" | "runs" | "inventory" | "settlements" | "search";
 type Flash = { type: "good" | "warn"; text: string } | null;
@@ -309,7 +310,10 @@ export default function Home() {
     const data = await response.json() as { state: LootState; connected: boolean; reason?: string };
     const local = localStorage.getItem("stoics-loot-state");
     const localState = local ? JSON.parse(local) as LootState : null;
-    setState(data.connected ? { ...data.state, vendingPrices: Object.keys(data.state.vendingPrices ?? {}).length > 0 ? data.state.vendingPrices : localState?.vendingPrices ?? {} } : localState ?? data.state);
+    const cloudPrices = normalizeVendingPrices(data.state.vendingPrices);
+    const localPrices = normalizeVendingPrices(localState?.vendingPrices);
+    const localIsNewer = localState && Date.parse(localState.lastUpdatedAt ?? "") >= Date.parse(data.state.lastUpdatedAt ?? "");
+    setState(data.connected ? { ...data.state, vendingPrices: localIsNewer ? normalizeVendingPrices({ ...cloudPrices, ...localPrices }) : cloudPrices } : localState ?? data.state);
     setConnected(Boolean(data.connected));
     setAuthenticated(true);
   }, []);
@@ -397,7 +401,7 @@ export default function Home() {
           {flash && <div className={`flash ${flash.type}`}><Check size={16} />{flash.text}</div>}
           {tab === "dashboard" && <Dashboard state={state} inventory={inventory} totalStock={totalStock} totalSales={totalSales} salaryPaid={salaryPaid} onRun={() => setShowRun(true)} onSale={() => setShowSale(true)} />}
           {tab === "runs" && <Runs state={state} onChange={persist} onRun={() => { setEditingRun(null); setShowRun(true); }} onEdit={(run) => { setEditingRun(run); setShowRun(true); }} />}
-          {tab === "inventory" && <Inventory inventory={inventory} onSale={() => setShowSale(true)} onPriceChange={(name, amount) => persist({ ...state, vendingPrices: { ...(state.vendingPrices ?? {}), [name.trim().toLowerCase()]: amount } }, `Updated ${name} vending amount`)} />}
+          {tab === "inventory" && <Inventory inventory={inventory} onSale={() => setShowSale(true)} onPriceChange={(name, amount) => persist({ ...state, vendingPrices: setVendingPrice(state.vendingPrices, name, amount) }, `Updated ${name} vending amount`)} />}
           {tab === "settlements" && <Settlements state={state} onSale={() => setShowSale(true)} />}
           {tab === "search" && <MemberSearch state={state} />}
         </div>

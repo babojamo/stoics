@@ -50,6 +50,37 @@ function inventoryFor(state: LootState) {
   return [...map.values()].map((row) => ({ ...row, available: row.collected - row.sold })).sort((a, b) => b.available - a.available);
 }
 
+function eligibleMembersForSale(state: LootState, lootName: string, quantity: number) {
+  const key = lootName.trim().toLowerCase();
+  let previouslySold = state.sales
+    .filter((sale) => sale.lootName.trim().toLowerCase() === key)
+    .reduce((sum, sale) => sum + sale.quantity, 0);
+  let requested = Math.max(0, quantity);
+  const contributingMembers = new Set<string>();
+  const lots = [...state.runs]
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .flatMap((run) => run.loots
+      .filter((loot) => loot.name.trim().toLowerCase() === key)
+      .map((loot) => ({ run, quantity: loot.quantity })));
+
+  for (const lot of lots) {
+    const consumed = Math.min(previouslySold, lot.quantity);
+    previouslySold -= consumed;
+    const available = lot.quantity - consumed;
+    if (available <= 0 || requested <= 0) continue;
+    lot.run.memberIds.forEach((id) => contributingMembers.add(id));
+    requested -= Math.min(requested, available);
+  }
+
+  const activeEligible = state.members
+    .filter((member) => member.active && contributingMembers.has(member.id))
+    .map((member) => member.id);
+  return [
+    ...state.payoutQueue.filter((id) => activeEligible.includes(id)),
+    ...activeEligible.filter((id) => !state.payoutQueue.includes(id)),
+  ];
+}
+
 function Logo() {
   return <div className="brand"><span className="brand-mark"><Gem size={20} /></span><div><strong>STOICS</strong><small>LOOT LEDGER</small></div></div>;
 }
@@ -219,8 +250,8 @@ function Settlements({ state, onSale }: { state: LootState; onSale: () => void }
 
 function RunModal({ state, currentUser, onClose, onSave }: { state: LootState; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {
   const [dungeon, setDungeon] = useState("Dekane Mine");
-  const [members, setMembers] = useState<Member[]>(state.members.map((m) => ({ ...m })));
-  const [selected, setSelected] = useState<string[]>(state.members.filter((m) => m.active).map((m) => m.id));
+  const [members, setMembers] = useState<Member[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
   const [loots, setLoots] = useState<RunLoot[]>([{ id: makeId(), name: "", quantity: 1 }]);
   const [reading, setReading] = useState(false);
   const [ocrNote, setOcrNote] = useState("Paste a party screenshot or choose an image.");
@@ -238,7 +269,8 @@ function RunModal({ state, currentUser, onClose, onSave }: { state: LootState; c
       const nextMembers = [...members];
       const nextSelected: string[] = [];
       names.forEach((name) => {
-        let member = nextMembers.find((m) => m.name.toLowerCase() === name.toLowerCase());
+        let member = nextMembers.find((m) => m.name.toLowerCase() === name.toLowerCase())
+          ?? state.members.find((m) => m.name.toLowerCase() === name.toLowerCase());
         if (!member) { member = { id: makeId(), name, active: true }; nextMembers.push(member); }
         nextSelected.push(member.id);
       });
@@ -251,16 +283,22 @@ function RunModal({ state, currentUser, onClose, onSave }: { state: LootState; c
     window.addEventListener("paste", paste); return () => window.removeEventListener("paste", paste);
   });
 
-  const addMember = () => { const member = { id: makeId(), name: "New member", active: true }; setMembers((current) => [...current, member]); setSelected((current) => [...current, member.id]); };
+  const addMember = () => { const member = { id: makeId(), name: "", active: true }; setMembers((current) => [...current, member]); setSelected((current) => [...current, member.id]); };
   const save = () => {
     const cleanLoots = loots.filter((loot) => loot.name.trim() && loot.quantity > 0);
     if (!dungeon.trim() || !selected.length || !cleanLoots.length) return;
-    const run: DungeonRun = { id: makeId(), dungeon: dungeon.trim(), createdAt: new Date().toISOString(), memberIds: selected, loots: cleanLoots, createdBy: currentUser };
-    const newIds = members.filter((m) => !state.members.some((old) => old.id === m.id)).map((m) => m.id);
-    onSave({ ...state, members, runs: [run, ...state.runs], payoutQueue: [...state.payoutQueue, ...newIds.filter((id) => !state.payoutQueue.includes(id))] });
+    const resolvedParty = members
+      .filter((member) => selected.includes(member.id) && member.name.trim())
+      .map((member) => state.members.find((existing) => existing.name.toLowerCase() === member.name.trim().toLowerCase()) ?? { ...member, name: member.name.trim() });
+    const uniqueParty = [...new Map(resolvedParty.map((member) => [member.id, member])).values()];
+    if (!uniqueParty.length) return;
+    const newMembers = uniqueParty.filter((member) => !state.members.some((existing) => existing.id === member.id));
+    const mergedMembers = [...state.members, ...newMembers];
+    const run: DungeonRun = { id: makeId(), dungeon: dungeon.trim(), createdAt: new Date().toISOString(), memberIds: uniqueParty.map((member) => member.id), loots: cleanLoots, createdBy: currentUser };
+    onSave({ ...state, members: mergedMembers, runs: [run, ...state.runs], payoutQueue: [...state.payoutQueue, ...newMembers.map((member) => member.id).filter((id) => !state.payoutQueue.includes(id))] });
   };
 
-  return <Modal title="Log a dungeon run" subtitle="Import the party, confirm the roster, then record every drop." onClose={onClose}><div className="modal-scroll"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Dungeon & party screenshot</strong><small>OCR will suggest member names for you.</small></div></div><label className="field">Dungeon name<input value={dungeon} onChange={(e) => setDungeon(e.target.value)} /></label><button className={`dropzone ${reading ? "reading" : ""}`} onClick={() => fileRef.current?.click()}><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0])} />{reading ? <LoaderCircle className="spin" /> : <ImagePlus />}<strong>{ocrNote}</strong><span>PNG or JPG · You can also press Ctrl+V</span></button></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Confirm party members</strong><small>Edit any name the screenshot reader got wrong.</small></div></div><div className="member-editor">{members.map((member) => <div key={member.id} className={selected.includes(member.id) ? "member-edit selected" : "member-edit"}><button onClick={() => setSelected((current) => current.includes(member.id) ? current.filter((id) => id !== member.id) : [...current, member.id])}>{selected.includes(member.id) && <Check size={13} />}</button><input value={member.name} onChange={(e) => setMembers((current) => current.map((m) => m.id === member.id ? { ...m, name: e.target.value } : m))} /><button className="remove" onClick={() => { setMembers((current) => current.filter((m) => m.id !== member.id)); setSelected((current) => current.filter((id) => id !== member.id)); }}><X size={14} /></button></div>)}</div><button className="text-button add-member" onClick={addMember}><Plus size={15} /> Add member manually</button></section><section className="form-section"><div className="section-label"><span>3</span><div><strong>Add loot</strong><small>Suggestions learn from previously saved loot names.</small></div></div><datalist id="loot-suggestions">{suggestions.map((name) => <option value={name} key={name} />)}</datalist><div className="loot-editor"><div className="loot-head"><span>Loot name</span><span>Quantity</span></div>{loots.map((loot) => <div className="loot-edit-row" key={loot.id}><input list="loot-suggestions" value={loot.name} placeholder="e.g. Sunstone" onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, name: e.target.value } : item))} /><input type="number" min="1" value={loot.quantity} onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, quantity: Number(e.target.value) } : item))} /><button className="icon-button" onClick={() => setLoots((current) => current.filter((item) => item.id !== loot.id))}><Trash2 size={15} /></button></div>)}</div><button className="text-button" onClick={() => setLoots((current) => [...current, { id: makeId(), name: "", quantity: 1 }])}><Plus size={15} /> Add another loot</button></section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" onClick={save}><Check size={16} /> Save dungeon run</button></div></Modal>;
+  return <Modal title="Log a dungeon run" subtitle="Import the party, confirm the roster, then record every drop." onClose={onClose}><div className="modal-scroll"><section className="form-section"><div className="section-label"><span>1</span><div><strong>Dungeon & party screenshot</strong><small>OCR will read names only after you add a screenshot.</small></div></div><label className="field">Dungeon name<input value={dungeon} onChange={(e) => setDungeon(e.target.value)} /></label><button className={`dropzone ${reading ? "reading" : ""}`} onClick={() => fileRef.current?.click()}><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0])} />{reading ? <LoaderCircle className="spin" /> : <ImagePlus />}<strong>{ocrNote}</strong><span>PNG or JPG · You can also press Ctrl+V</span></button></section><section className="form-section"><div className="section-label"><span>2</span><div><strong>Confirm party members</strong><small>No members are prefilled. Import a screenshot or add them manually.</small></div></div><datalist id="member-suggestions">{state.members.map((member) => <option value={member.name} key={member.id} />)}</datalist><div className="member-editor">{members.map((member) => <div key={member.id} className={selected.includes(member.id) ? "member-edit selected" : "member-edit"}><button onClick={() => setSelected((current) => current.includes(member.id) ? current.filter((id) => id !== member.id) : [...current, member.id])}>{selected.includes(member.id) && <Check size={13} />}</button><input list="member-suggestions" value={member.name} placeholder="Start typing a saved member name" onChange={(e) => setMembers((current) => current.map((m) => m.id === member.id ? { ...m, name: e.target.value } : m))} /><button className="remove" onClick={() => { setMembers((current) => current.filter((m) => m.id !== member.id)); setSelected((current) => current.filter((id) => id !== member.id)); }}><X size={14} /></button></div>)}</div><button className="text-button add-member" onClick={addMember}><Plus size={15} /> Add member manually</button></section><section className="form-section"><div className="section-label"><span>3</span><div><strong>Add loot</strong><small>Suggestions learn from previously saved loot names.</small></div></div><datalist id="loot-suggestions">{suggestions.map((name) => <option value={name} key={name} />)}</datalist><div className="loot-editor"><div className="loot-head"><span>Loot name</span><span>Quantity</span></div>{loots.map((loot) => <div className="loot-edit-row" key={loot.id}><input list="loot-suggestions" value={loot.name} placeholder="e.g. Sunstone" onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, name: e.target.value } : item))} /><input type="number" min="1" value={loot.quantity} onChange={(e) => setLoots((current) => current.map((item) => item.id === loot.id ? { ...item, quantity: Number(e.target.value) } : item))} /><button className="icon-button" onClick={() => setLoots((current) => current.filter((item) => item.id !== loot.id))}><Trash2 size={15} /></button></div>)}</div><button className="text-button" onClick={() => setLoots((current) => [...current, { id: makeId(), name: "", quantity: 1 }])}><Plus size={15} /> Add another loot</button></section></div><div className="modal-footer"><button className="secondary" onClick={onClose}>Cancel</button><button className="primary" onClick={save}><Check size={16} /> Save dungeon run</button></div></Modal>;
 }
 
 function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: LootState; inventory: ReturnType<typeof inventoryFor>; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {
@@ -269,13 +307,9 @@ function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: 
   const stock = available.find((item) => item.name === lootName);
   const [quantity, setQuantity] = useState(stock?.available ?? 1);
   const [unitPrice, setUnitPrice] = useState(0);
-  const eligibleIds = useMemo(() => {
-    const runIds = new Set(stock?.runIds ?? []);
-    const participants = new Set(state.runs.filter((run) => runIds.has(run.id)).flatMap((run) => run.memberIds));
-    return state.payoutQueue.filter((id) => participants.has(id) && state.members.find((m) => m.id === id)?.active);
-  }, [state, stock]);
+  const eligibleIds = useMemo(() => eligibleMembersForSale(state, lootName, quantity), [state, lootName, quantity]);
   const [recipients, setRecipients] = useState<string[]>([]);
-  useEffect(() => { setRecipients(eligibleIds); }, [lootName]);
+  useEffect(() => { setRecipients(eligibleIds); }, [eligibleIds]);
   useEffect(() => { setQuantity(stock?.available ?? 1); }, [lootName, stock?.available]);
   const total = quantity * unitPrice;
   const salary = recipients.length ? Math.floor(total / recipients.length) : 0;

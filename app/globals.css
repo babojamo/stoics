@@ -1,9 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
 :root { --ink:#17202a; --muted:#6f7784; --line:#e7e4dc; --paper:#f6f4ee; --card:#fff; --violet:#6556d8; --violet-dark:#4d3fc0; --gold:#d79836; --mint:#198d76; }
 * { box-sizing:border-box; }
-html,body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); font-family:Inter,"Segoe UI",Arial,sans-serif; }
+button,input,select,textarea { font-family:inherit; }
+.brand strong,.login-copy h1,.login-card h2,.page-title h1,.metric>strong,.panel h2,.run-date strong,.run-title h2,.stock-name h2,.stock-stats strong,.sale-info h2,.sale-total strong,.salary strong,.empty h2,.modal-head h2,.sale-summary strong { font-family:"Manrope","Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:-.025em; }
+html,body { margin:0; min-height:100%; background:var(--paper); color:var(--ink); font-family:"Manrope","Google Sans","Segoe UI",Arial,sans-serif; }
 button,input,select { font:inherit; }
 button { cursor:pointer; }
 button:disabled { cursor:not-allowed; opacity:.45; }

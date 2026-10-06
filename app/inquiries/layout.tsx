@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-const inquiriesUrl = "https://stoics-loots.kevinloquencio.chatgpt.site/inquiries";
+const publicOrigin = "https://stoics-loots.lokwensio.com";
+const inquiriesUrl = `${publicOrigin}/inquiries`;
 const title = "Stoics Loot Ledger | Public Loot & Salary Inquiries";
 const description = "Search the Stoics Flyff Universe loot ledger to review members' pending dungeon loot, estimated salaries, paid loot, and total payouts.";
 
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
     title,
     description,
     images: [{
-      url: "https://stoics-loots.kevinloquencio.chatgpt.site/stoics-logo.webp",
+      url: `${publicOrigin}/stoics-logo.webp`,
       width: 1024,
       height: 1024,
       alt: "Stoics guild emblem",
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title,
     description,
-    images: ["https://stoics-loots.kevinloquencio.chatgpt.site/stoics-logo.webp"],
+    images: [`${publicOrigin}/stoics-logo.webp`],
   },
 };
 
@@ -48,7 +49,7 @@ const structuredData = {
   isPartOf: {
     "@type": "WebSite",
     name: "Stoics Loot Ledger",
-    url: "https://stoics-loots.kevinloquencio.chatgpt.site/",
+    url: `${publicOrigin}/`,
   },
   about: {
     "@type": "Thing",

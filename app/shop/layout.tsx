@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-const shopUrl = "https://stoics-loots.kevinloquencio.chatgpt.site/shop";
+const publicOrigin = "https://stoics-loots.lokwensio.com";
+const shopUrl = `${publicOrigin}/shop`;
 const title = "Stoics Loot Shop | Flyff Universe Vending Prices";
 const description = "Browse the Stoics Flyff Universe loot shop, search available dungeon loot, and check the latest vending price for every item.";
 
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
     title,
     description,
     images: [{
-      url: "https://stoics-loots.kevinloquencio.chatgpt.site/stoics-logo.webp",
+      url: `${publicOrigin}/stoics-logo.webp`,
       width: 1024,
       height: 1024,
       alt: "Stoics guild emblem",
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title,
     description,
-    images: ["https://stoics-loots.kevinloquencio.chatgpt.site/stoics-logo.webp"],
+    images: [`${publicOrigin}/stoics-logo.webp`],
   },
 };
 
@@ -48,7 +49,7 @@ const structuredData = {
   isPartOf: {
     "@type": "WebSite",
     name: "Stoics Loot Ledger",
-    url: "https://stoics-loots.kevinloquencio.chatgpt.site/",
+    url: `${publicOrigin}/`,
   },
   mainEntity: {
     "@type": "ProductCollection",

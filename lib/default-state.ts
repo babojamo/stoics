@@ -27,6 +27,7 @@ export const defaultState: LootState = {
   ],
   sales: [],
   vendingPrices: {},
+  lootImages: {},
   payoutQueue: ["m-aeris", "m-kaizen", "m-nyx", "m-riven", "m-seraph", "m-volt", "m-lumi", "m-orion"],
   auditLog: [],
 };

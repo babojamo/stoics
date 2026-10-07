@@ -1,5 +1,6 @@
 import type { LootState } from "../../../lib/types";
 import { getRuntimeEnv } from "../../../lib/runtime-env";
+import { lootImageFor } from "../../../lib/loot-images";
 
 function supabaseHeaders() {
   const key = getRuntimeEnv().NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
@@ -56,6 +57,7 @@ export async function GET() {
     .map((item) => ({
       name: item.name,
       vendingPrice: vendingPriceFor(state, item.name),
+      image: lootImageFor(state.lootImages, item.name),
       available: Math.max(0, item.collected - item.sold),
     }))
     .sort((left, right) => left.name.localeCompare(right.name));

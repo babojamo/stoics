@@ -29,6 +29,7 @@ import {
 import { defaultState } from "../lib/default-state";
 import type { DungeonRun, LootState, Member, RunLoot, Sale } from "../lib/types";
 import { normalizeVendingPrices, setVendingPrice } from "../lib/vending-prices";
+import { lootImageFor, normalizeLootImages, setLootImage } from "../lib/loot-images";
 import { PenyaAmount, PenyaCoin } from "./components/penya";
 
 type Tab = "dashboard" | "runs" | "inventory" | "settlements" | "search";
@@ -63,7 +64,26 @@ function inventoryFor(state: LootState) {
     const row = map.get(sale.lootName.trim().toLowerCase());
     if (row) row.sold += sale.quantity;
   });
-  return [...map.values()].map((row) => ({ ...row, available: row.collected - row.sold, vendingAmount: vendingPriceFor(state, row.name) })).sort((a, b) => b.available - a.available);
+  return [...map.values()].map((row) => ({ ...row, available: row.collected - row.sold, vendingAmount: vendingPriceFor(state, row.name), image: lootImageFor(state.lootImages, row.name) })).sort((a, b) => b.available - a.available);
+}
+
+async function resizeLootPhoto(file: File) {
+  if (!file.type.startsWith("image/")) throw new Error("Choose an image file.");
+  if (file.size > 12 * 1024 * 1024) throw new Error("Choose an image smaller than 12 MB.");
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) { bitmap.close(); throw new Error("This browser could not prepare the image."); }
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const image = canvas.toDataURL("image/webp", 0.82);
+  if (image.length > 700_000) throw new Error("The prepared image is still too large. Try a smaller photo.");
+  return image;
 }
 
 function soldQuantitiesByRunLoot(state: LootState) {
@@ -318,8 +338,10 @@ export default function Home() {
     const localState = local ? JSON.parse(local) as LootState : null;
     const cloudPrices = normalizeVendingPrices(data.state.vendingPrices);
     const localPrices = normalizeVendingPrices(localState?.vendingPrices);
+    const cloudImages = normalizeLootImages(data.state.lootImages);
+    const localImages = normalizeLootImages(localState?.lootImages);
     const localIsNewer = localState && Date.parse(localState.lastUpdatedAt ?? "") >= Date.parse(data.state.lastUpdatedAt ?? "");
-    setState(data.connected ? { ...data.state, vendingPrices: localIsNewer ? normalizeVendingPrices({ ...cloudPrices, ...localPrices }) : cloudPrices } : localState ?? data.state);
+    setState(data.connected ? { ...data.state, vendingPrices: localIsNewer ? normalizeVendingPrices({ ...cloudPrices, ...localPrices }) : cloudPrices, lootImages: localIsNewer ? normalizeLootImages({ ...cloudImages, ...localImages }) : cloudImages } : localState ?? data.state);
     setConnected(Boolean(data.connected));
     setAuthenticated(true);
   }, []);
@@ -407,7 +429,7 @@ export default function Home() {
           {flash && <div className={`flash ${flash.type}`}><Check size={16} />{flash.text}</div>}
           {tab === "dashboard" && <Dashboard state={state} inventory={inventory} totalStock={totalStock} totalSales={totalSales} salaryPaid={salaryPaid} onRun={() => setShowRun(true)} onSale={() => setShowSale(true)} />}
           {tab === "runs" && <Runs state={state} onChange={persist} onRun={() => { setEditingRun(null); setShowRun(true); }} onEdit={(run) => { setEditingRun(run); setShowRun(true); }} />}
-          {tab === "inventory" && <Inventory inventory={inventory} onSale={() => setShowSale(true)} onPriceChange={(name, amount) => persist({ ...state, vendingPrices: setVendingPrice(state.vendingPrices, name, amount) }, `Updated ${name} vending amount`)} />}
+          {tab === "inventory" && <Inventory inventory={inventory} onSale={() => setShowSale(true)} onPriceChange={(name, amount) => persist({ ...state, vendingPrices: setVendingPrice(state.vendingPrices, name, amount) }, `Updated ${name} vending amount`)} onImageChange={(name, image) => persist({ ...state, lootImages: setLootImage(state.lootImages, name, image) }, `Updated ${name} loot photo`)} />}
           {tab === "settlements" && <Settlements state={state} onSale={() => setShowSale(true)} />}
           {tab === "search" && <MemberSearch state={state} />}
         </div>
@@ -482,10 +504,24 @@ function EditableLoot({ loot, soldQuantity, locked, onChange }: { loot: RunLoot;
   return <div className={`editable-loot ${soldQuantity > 0 ? "has-sales" : ""}`}><Gem size={16} /><input aria-label={`${loot.name} name`} disabled={locked} value={loot.name} onChange={(e) => onChange({ ...loot, name: e.target.value })} /><input aria-label={`${loot.name} quantity`} className="qty" type="number" min="0" disabled={locked} value={loot.quantity} onChange={(e) => onChange({ ...loot, quantity: Number(e.target.value) })} /><span className={`loot-sale-status ${soldQuantity >= loot.quantity ? "complete" : soldQuantity > 0 ? "partial" : "unsold"}`}>{status}</span></div>;
 }
 
-function Inventory({ inventory, onSale, onPriceChange }: { inventory: ReturnType<typeof inventoryFor>; onSale: () => void; onPriceChange: (name: string, amount: number) => void }) {
+function Inventory({ inventory, onSale, onPriceChange, onImageChange }: { inventory: ReturnType<typeof inventoryFor>; onSale: () => void; onPriceChange: (name: string, amount: number) => void; onImageChange: (name: string, image: string) => void }) {
   const [query, setQuery] = useState("");
   const shown = inventory.filter((item) => item.name.toLowerCase().includes(query.toLowerCase()));
-  return <><PageTitle eyebrow="STOCK ROOM" title="Loot inventory" text="Accumulated loot, recorded sales, and the expected vending amount for each item." action={<button className="primary" onClick={onSale}><Coins size={17} /> Sell loot</button>} /><div className="inventory-toolbar"><div className="search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search loot…" /></div><span>{shown.length} item types</span></div><div className="inventory-cards">{shown.map((item, index) => <article className="stock-card" key={item.name}><div className={`stock-icon rune-${index % 4}`}><Gem /></div><div className="stock-name"><span>LOOT ITEM</span><h2>{item.name}</h2></div><div className="stock-stats"><div><span>Collected</span><strong>{item.collected.toLocaleString()}</strong></div><div><span>Sold</span><strong>{item.sold.toLocaleString()}</strong></div><div className="available"><span>Available</span><strong>{item.available.toLocaleString()}</strong></div><div className="vending-price"><span>Vending amount</span><VendingPriceInput value={item.vendingAmount} onCommit={(amount) => onPriceChange(item.name, amount)} /></div></div><button className="secondary" disabled={item.available <= 0} onClick={onSale}>Record sale</button></article>)}</div></>;
+  return <><PageTitle eyebrow="STOCK ROOM" title="Loot inventory" text="Accumulated loot, recorded sales, vending amounts, and item photos." action={<button className="primary" onClick={onSale}><Coins size={17} /> Sell loot</button>} /><div className="inventory-toolbar"><div className="search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search loot…" /></div><span>{shown.length} item types</span></div><div className="inventory-cards">{shown.map((item, index) => <article className="stock-card" key={item.name}><LootPhotoEditor name={item.name} image={item.image} rune={index % 4} onChange={(image) => onImageChange(item.name, image)} /><div className="stock-name"><span>LOOT ITEM</span><h2>{item.name}</h2></div><div className="stock-stats"><div><span>Collected</span><strong>{item.collected.toLocaleString()}</strong></div><div><span>Sold</span><strong>{item.sold.toLocaleString()}</strong></div><div className="available"><span>Available</span><strong>{item.available.toLocaleString()}</strong></div><div className="vending-price"><span>Vending amount</span><VendingPriceInput value={item.vendingAmount} onCommit={(amount) => onPriceChange(item.name, amount)} /></div></div><button className="secondary" disabled={item.available <= 0} onClick={onSale}>Record sale</button></article>)}</div></>;
+}
+
+function LootPhotoEditor({ name, image, rune, onChange }: { name: string; image: string; rune: number; onChange: (image: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const handleFile = async (file?: File) => {
+    if (!file) return;
+    setBusy(true); setError("");
+    try { onChange(await resizeLootPhoto(file)); }
+    catch (problem) { setError(problem instanceof Error ? problem.message : "Could not use that image."); }
+    finally { setBusy(false); }
+  };
+  return <div className="loot-photo-editor" tabIndex={0} onPaste={(event) => { const file = [...event.clipboardData.files].find((candidate) => candidate.type.startsWith("image/")); if (file) { event.preventDefault(); void handleFile(file); } }} aria-label={`Photo for ${name}. Paste an image here or browse.`}><button type="button" className={`stock-icon rune-${rune} ${image ? "has-image" : ""}`} onClick={() => inputRef.current?.click()} aria-label={`Browse for ${name} photo`}>{busy ? <LoaderCircle className="spin" /> : image ? <img src={image} alt={`${name} loot item`} /> : <Gem />}</button><button type="button" className="loot-photo-browse" onClick={() => inputRef.current?.click()}><ImagePlus size={13} /> {image ? "Replace" : "Add photo"}</button><small>{error || "Paste here or browse"}</small><input ref={inputRef} hidden type="file" accept="image/*" onChange={(event) => { void handleFile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></div>;
 }
 
 function VendingPriceInput({ value, onCommit }: { value: number; onCommit: (value: number) => void }) {

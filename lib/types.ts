@@ -44,6 +44,7 @@ export type LootState = {
   runs: DungeonRun[];
   sales: Sale[];
   vendingPrices: Record<string, number>;
+  lootImages: Record<string, string>;
   payoutQueue: string[];
   auditLog: AuditEntry[];
   lastUpdatedBy?: string;

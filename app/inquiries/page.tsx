@@ -24,7 +24,7 @@ export default function InquiriesPage() {
     const url = new URL(window.location.href);
     if (query.trim()) url.searchParams.set("query", query.trim());
     else url.searchParams.delete("query");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
     if (!query.trim()) return;
 
     const controller = new AbortController();

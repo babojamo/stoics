@@ -3,6 +3,7 @@ import { defaultState } from "../../../lib/default-state";
 import type { LootState } from "../../../lib/types";
 import { getRuntimeEnv } from "../../../lib/runtime-env";
 import { normalizeVendingPrices } from "../../../lib/vending-prices";
+import { normalizeLootImages } from "../../../lib/loot-images";
 
 const rowId = "guild";
 
@@ -25,6 +26,7 @@ function normalizeState(value: Partial<LootState> | null | undefined): LootState
     runs: value?.runs ?? [],
     sales: value?.sales ?? [],
     vendingPrices: normalizeVendingPrices(value?.vendingPrices),
+    lootImages: normalizeLootImages(value?.lootImages),
     payoutQueue: value?.payoutQueue ?? [],
     auditLog: value?.auditLog ?? [],
     lastUpdatedBy: value?.lastUpdatedBy,
@@ -87,6 +89,20 @@ export async function PUT(request: Request) {
           return Number(savedAmount) === Number(amount);
         });
         if (!pricesPersisted) return Response.json({ error: "Vending amounts need the updated supabase-schema.sql before cloud saving." }, { status: 503 });
+      }
+    }
+    const images = state.lootImages ?? {};
+    if (Object.keys(images).length > 0) {
+      const verifyResponse = await fetch(`${url}/rest/v1/rpc/get_stoics_loot_state`, {
+        method: "POST", headers: supabaseHeaders(), body: "{}", cache: "no-store",
+      });
+      if (verifyResponse.ok) {
+        const saved = normalizeState((await verifyResponse.json()) as LootState);
+        const imagesPersisted = Object.entries(images).every(([name, image]) => {
+          const savedImage = Object.entries(saved.lootImages).find(([savedName]) => savedName.trim().toLowerCase() === name.trim().toLowerCase())?.[1];
+          return savedImage === image;
+        });
+        if (!imagesPersisted) return Response.json({ error: "Loot photos need the included supabase-loot-images.sql before cloud saving." }, { status: 503 });
       }
     }
     return Response.json({ ok: true });

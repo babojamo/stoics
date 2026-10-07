@@ -37,6 +37,11 @@ type Flash = { type: "good" | "warn"; text: string } | null;
 
 const plainAmount = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const lootQuantityAmount = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 });
+const compactMailAmount = (value: number) => {
+  const divisor = value >= 1_000_000_000 ? 1_000_000_000 : value >= 1_000_000 ? 1_000_000 : 1_000;
+  const suffix = value >= 1_000_000_000 ? "B" : value >= 1_000_000 ? "M" : "K";
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value / divisor)}${suffix}`;
+};
 const dateTime = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 const makeId = () => crypto.randomUUID();
@@ -709,7 +714,7 @@ function SaleModal({ state, inventory, currentUser, onClose, onSave }: { state: 
   const formattedMailLootQuantity = lootQuantityAmount.format(selectedMailLootQuantity);
   const mailLootName = selectedMailLootQuantity === 1 || /s$/i.test(lootName) ? lootName : `${lootName}s`;
   const mailHeader = `SOLD ${formattedMailLootQuantity} ${mailLootName}`;
-  const mailContent = `Sold ${formattedMailLootQuantity} ${mailLootName} | ${plainAmount.format(selectedMailSalary)} Total`;
+  const mailContent = `Sold ${formattedMailLootQuantity} ${mailLootName} ${compactMailAmount(unitPrice)} Each | ${plainAmount.format(selectedMailSalary)} Total`;
   const copyText = async (key: string, value: string) => {
     try {
       await navigator.clipboard.writeText(value);

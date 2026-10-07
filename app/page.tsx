@@ -95,22 +95,79 @@ async function resizeLootPhoto(file: File) {
   return image;
 }
 
-function soldQuantitiesByRunLoot(state: LootState) {
-  const remainingSold = new Map<string, number>();
-  state.sales.forEach((sale) => {
-    const key = sale.lootName.trim().toLowerCase();
-    remainingSold.set(key, (remainingSold.get(key) ?? 0) + sale.quantity);
-  });
-  const soldByLoot = new Map<string, number>();
-  [...state.runs]
+type ResolvedSaleAllocation = { runLootId: string; quantity: number };
+
+function resolveSaleAllocations(state: LootState) {
+  const lots = state.runs.flatMap((run) => run.loots.map((loot) => ({
+    run,
+    loot,
+    remaining: loot.quantity,
+  })));
+  const lotById = new Map(lots.map((lot) => [lot.loot.id, lot]));
+  const allocationsBySale = new Map<string, ResolvedSaleAllocation[]>();
+  const recipientOverlap = (sale: Sale, run: DungeonRun) => {
+    const recipients = new Set(sale.recipientIds);
+    return run.memberIds.reduce((total, memberId) => total + (recipients.has(memberId) ? 1 : 0), 0);
+  };
+
+  [...state.sales]
     .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
-    .forEach((run) => run.loots.forEach((loot) => {
-      const nameKey = loot.name.trim().toLowerCase();
-      const sold = Math.min(loot.quantity, remainingSold.get(nameKey) ?? 0);
-      soldByLoot.set(`${run.id}:${loot.id}`, sold);
-      remainingSold.set(nameKey, Math.max(0, (remainingSold.get(nameKey) ?? 0) - sold));
-    }));
+    .forEach((sale) => {
+      const lootKey = sale.lootName.trim().toLowerCase();
+      let requested = Math.max(0, sale.quantity);
+      const resolved: ResolvedSaleAllocation[] = [];
+      const candidates = () => lots.filter((lot) => lot.remaining > 0 && lot.loot.name.trim().toLowerCase() === lootKey);
+      const bestOverlap = () => candidates().reduce((best, lot) => Math.max(best, recipientOverlap(sale, lot.run)), 0);
+
+      for (const allocation of sale.allocations ?? []) {
+        const lot = lotById.get(allocation.runLootId);
+        if (!lot || lot.remaining <= 0 || lot.loot.name.trim().toLowerCase() !== lootKey || requested <= 0) continue;
+        // Older database allocations were date-based. Ignore a zero-party match when
+        // another unsold run contains the members who were actually paid.
+        if (recipientOverlap(sale, lot.run) === 0 && bestOverlap() > 0) continue;
+        const quantity = Math.min(requested, lot.remaining, Math.max(0, allocation.quantity));
+        if (quantity <= 0) continue;
+        resolved.push({ runLootId: lot.loot.id, quantity });
+        lot.remaining -= quantity;
+        requested -= quantity;
+      }
+
+      const fallbackLots = candidates().sort((left, right) => {
+        const overlapDifference = recipientOverlap(sale, right.run) - recipientOverlap(sale, left.run);
+        if (overlapDifference !== 0) return overlapDifference;
+        return new Date(left.run.createdAt).getTime() - new Date(right.run.createdAt).getTime();
+      });
+      for (const lot of fallbackLots) {
+        if (requested <= 0) break;
+        const quantity = Math.min(requested, lot.remaining);
+        if (quantity <= 0) continue;
+        resolved.push({ runLootId: lot.loot.id, quantity });
+        lot.remaining -= quantity;
+        requested -= quantity;
+      }
+      allocationsBySale.set(sale.id, resolved);
+    });
+
+  return allocationsBySale;
+}
+
+function soldQuantitiesByRunLoot(state: LootState) {
+  const soldByLoot = new Map<string, number>();
+  const runIdByLootId = new Map(state.runs.flatMap((run) => run.loots.map((loot) => [loot.id, run.id] as const)));
+  for (const allocations of resolveSaleAllocations(state).values()) {
+    allocations.forEach((allocation) => {
+      const runId = runIdByLootId.get(allocation.runLootId);
+      if (!runId) return;
+      const key = `${runId}:${allocation.runLootId}`;
+      soldByLoot.set(key, (soldByLoot.get(key) ?? 0) + allocation.quantity);
+    });
+  }
   return soldByLoot;
+}
+
+function withResolvedSaleAllocations(state: LootState): LootState {
+  const resolved = resolveSaleAllocations(state);
+  return { ...state, sales: state.sales.map((sale) => ({ ...sale, allocations: resolved.get(sale.id) ?? [] })) };
 }
 
 function currentPayoutQueue(state: LootState) {
@@ -149,24 +206,19 @@ function pendingLootByMember(state: LootState) {
 
 function contributingLotsForSale(state: LootState, lootName: string, quantity: number) {
   const key = lootName.trim().toLowerCase();
-  let previouslySold = state.sales
-    .filter((sale) => sale.lootName.trim().toLowerCase() === key)
-    .reduce((sum, sale) => sum + sale.quantity, 0);
+  const soldByLoot = soldQuantitiesByRunLoot(state);
   let requested = Math.max(0, quantity);
-  const contributions: Array<{ run: DungeonRun; quantity: number }> = [];
+  const contributions: Array<{ run: DungeonRun; runLootId: string; quantity: number }> = [];
   const lots = [...state.runs]
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .flatMap((run) => run.loots
       .filter((loot) => loot.name.trim().toLowerCase() === key)
-      .map((loot) => ({ run, quantity: loot.quantity })));
+      .map((loot) => ({ run, runLootId: loot.id, available: loot.quantity - (soldByLoot.get(`${run.id}:${loot.id}`) ?? 0) })));
 
   for (const lot of lots) {
-    const consumed = Math.min(previouslySold, lot.quantity);
-    previouslySold -= consumed;
-    const available = lot.quantity - consumed;
-    if (available <= 0 || requested <= 0) continue;
-    const soldFromLot = Math.min(requested, available);
-    contributions.push({ run: lot.run, quantity: soldFromLot });
+    if (lot.available <= 0 || requested <= 0) continue;
+    const soldFromLot = Math.min(requested, lot.available);
+    contributions.push({ run: lot.run, runLootId: lot.runLootId, quantity: soldFromLot });
     requested -= soldFromLot;
   }
 
@@ -362,7 +414,8 @@ export default function Home() {
     const cloudImages = normalizeLootImages(data.state.lootImages);
     const localImages = normalizeLootImages(localState?.lootImages);
     const localIsNewer = localState && Date.parse(localState.lastUpdatedAt ?? "") >= Date.parse(data.state.lastUpdatedAt ?? "");
-    setState(data.connected ? { ...data.state, vendingPrices: localIsNewer ? normalizeVendingPrices({ ...cloudPrices, ...localPrices }) : cloudPrices, lootImages: localIsNewer ? normalizeLootImages({ ...cloudImages, ...localImages }) : cloudImages } : localState ?? data.state);
+    const loadedState = data.connected ? { ...data.state, vendingPrices: localIsNewer ? normalizeVendingPrices({ ...cloudPrices, ...localPrices }) : cloudPrices, lootImages: localIsNewer ? normalizeLootImages({ ...cloudImages, ...localImages }) : cloudImages } : localState ?? data.state;
+    setState(withResolvedSaleAllocations(loadedState));
     setConnected(Boolean(data.connected));
     setAuthenticated(true);
   }, []);
@@ -376,9 +429,10 @@ export default function Home() {
 
   const persist = async (next: LootState, action = "Updated loot data") => {
     const now = new Date().toISOString();
+    const reconciled = withResolvedSaleAllocations(next);
     const stamped: LootState = {
-      ...next,
-      auditLog: [{ id: makeId(), username: currentUser, action, createdAt: now }, ...(next.auditLog ?? [])].slice(0, 100),
+      ...reconciled,
+      auditLog: [{ id: makeId(), username: currentUser, action, createdAt: now }, ...(reconciled.auditLog ?? [])].slice(0, 100),
       lastUpdatedBy: currentUser,
       lastUpdatedAt: now,
     };
@@ -817,7 +871,8 @@ function SaleModal({ state, inventory, initialLootName: requestedLootName, curre
   const save = () => {
     if (!lootName || quantity < 1 || quantity > (stock?.available ?? 0) || unitPrice <= 0 || !recipients.length || !allocationComplete) return;
     const salaryEach = recipients.length ? Math.round((allocatedTotal / recipients.length) * 100) / 100 : 0;
-    const sale: Sale = { id: makeId(), lootName, quantity, unitPrice, total, recipientIds: recipients, salaryEach, recipientAmounts, createdAt: new Date().toISOString(), createdBy: currentUser };
+    const allocations = contributingLotsForSale(state, lootName, quantity).map(({ runLootId, quantity: allocatedQuantity }) => ({ runLootId, quantity: allocatedQuantity }));
+    const sale: Sale = { id: makeId(), lootName, quantity, unitPrice, total, recipientIds: recipients, salaryEach, recipientAmounts, allocations, createdAt: new Date().toISOString(), createdBy: currentUser };
     const unpaid = currentPayoutQueue(state).filter((id) => !recipients.includes(id));
     const nextState = { ...state, sales: [sale, ...state.sales], payoutQueue: [...unpaid, ...recipients] };
     onSave({ ...nextState, payoutQueue: currentPayoutQueue(nextState) });

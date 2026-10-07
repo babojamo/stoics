@@ -28,6 +28,7 @@ export type Sale = {
   recipientIds: string[];
   salaryEach: number;
   recipientAmounts?: Record<string, number>;
+  allocations?: Array<{ runLootId: string; quantity: number }>;
   createdAt: string;
   createdBy?: string;
 };

@@ -14,7 +14,8 @@ create or replace function public.get_stoics_loot_state() returns jsonb language
     'sales', coalesce((select jsonb_agg(jsonb_build_object(
       'id',s.id,'lootName',li.name,'quantity',s.quantity,'unitPrice',s.unit_price,'total',s.total,'salaryEach',s.salary_each,'createdAt',s.created_at,'createdBy',s.created_by,
       'recipientIds',coalesce((select jsonb_agg(sr.member_id order by sr.queue_position) from public.sale_recipients sr where sr.sale_id=s.id),'[]'::jsonb),
-      'recipientAmounts',coalesce((select jsonb_object_agg(sr.member_id,sr.salary_amount) from public.sale_recipients sr where sr.sale_id=s.id),'{}'::jsonb)
+      'recipientAmounts',coalesce((select jsonb_object_agg(sr.member_id,sr.salary_amount) from public.sale_recipients sr where sr.sale_id=s.id),'{}'::jsonb),
+      'allocations',coalesce((select jsonb_agg(jsonb_build_object('runLootId',sa.run_loot_id,'quantity',sa.quantity) order by sa.run_loot_id) from public.sale_allocations sa where sa.sale_id=s.id),'[]'::jsonb)
     ) order by s.sort_order) from public.sales s join public.loot_items li on li.id=s.loot_item_id), '[]'::jsonb),
     'vendingPrices', coalesce((select jsonb_object_agg(li.name,li.vending_price) from public.loot_items li), '{}'::jsonb),
     'lootImages', coalesce((select jsonb_object_agg(li.name,li.image_data) from public.loot_items li where nullif(li.image_data,'') is not null), '{}'::jsonb),
@@ -80,6 +81,13 @@ begin
   values (true,p_actor,coalesce(nullif(p_state->>'lastUpdatedAt','')::timestamptz,now()));
 
   insert into public.sale_allocations (sale_id,run_loot_id,quantity)
+  select s.value->>'id',allocation.value->>'runLootId',(allocation.value->>'quantity')::integer
+  from jsonb_array_elements(coalesce(p_state->'sales','[]'::jsonb)) s(value)
+  cross join lateral jsonb_array_elements(coalesce(s.value->'allocations','[]'::jsonb)) allocation(value)
+  where coalesce((allocation.value->>'quantity')::integer,0)>0
+    and exists (select 1 from public.run_loot rl where rl.id=allocation.value->>'runLootId');
+
+  insert into public.sale_allocations (sale_id,run_loot_id,quantity)
   with lots as (
     select rl.id,rl.loot_item_id,coalesce(sum(rl.quantity) over (partition by rl.loot_item_id order by dr.created_at,rl.id rows between unbounded preceding and 1 preceding),0) lot_start,
       sum(rl.quantity) over (partition by rl.loot_item_id order by dr.created_at,rl.id) lot_end
@@ -91,7 +99,9 @@ begin
   )
   select os.id,lots.id,(least(os.sale_end,lots.lot_end)-greatest(os.sale_start,lots.lot_start))::integer
   from ordered_sales os join lots on lots.loot_item_id=os.loot_item_id
-  where least(os.sale_end,lots.lot_end)>greatest(os.sale_start,lots.lot_start);
+  where least(os.sale_end,lots.lot_end)>greatest(os.sale_start,lots.lot_start)
+    and not exists (select 1 from public.sale_allocations sa where sa.sale_id=os.id)
+  on conflict (sale_id,run_loot_id) do nothing;
 end;
 $$;
 

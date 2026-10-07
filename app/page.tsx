@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
+  BarChart3,
   Check,
   ChevronRight,
   Coins,
@@ -26,13 +27,14 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { defaultState } from "../lib/default-state";
 import type { DungeonRun, LootState, Member, RunLoot, Sale } from "../lib/types";
 import { normalizeVendingPrices, setVendingPrice } from "../lib/vending-prices";
 import { lootImageFor, normalizeLootImages, setLootImage } from "../lib/loot-images";
 import { PenyaAmount, PenyaCoin } from "./components/penya";
 
-type Tab = "dashboard" | "runs" | "inventory" | "settlements" | "search";
+type Tab = "dashboard" | "runs" | "inventory" | "settlements" | "statistics" | "search";
 type Flash = { type: "good" | "warn"; text: string } | null;
 
 const plainAmount = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -46,6 +48,7 @@ const dateTime = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeri
 
 const makeId = () => crypto.randomUUID();
 const cloneSeed = () => JSON.parse(JSON.stringify(defaultState)) as LootState;
+const localDateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 
 function toDateTimeLocalValue(date: Date) {
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -426,6 +429,7 @@ export default function Home() {
     { id: "runs", label: "Dungeon runs", icon: <ShieldCheck size={18} /> },
     { id: "inventory", label: "Loot inventory", icon: <Archive size={18} /> },
     { id: "settlements", label: "Sales & salaries", icon: <Coins size={18} /> },
+    { id: "statistics", label: "Statistics", icon: <BarChart3 size={18} /> },
     { id: "search", label: "Member search", icon: <Search size={18} /> },
   ];
 
@@ -454,6 +458,7 @@ export default function Home() {
           {tab === "runs" && <Runs state={state} onChange={persist} onRun={() => { setEditingRun(null); setShowRun(true); }} onEdit={(run) => { setEditingRun(run); setShowRun(true); }} />}
           {tab === "inventory" && <Inventory inventory={inventory} onSale={openSale} onPriceChange={(name, amount) => persist({ ...state, vendingPrices: setVendingPrice(state.vendingPrices, name, amount) }, `Updated ${name} vending amount`)} onImageChange={(name, image) => persist({ ...state, lootImages: setLootImage(state.lootImages, name, image) }, `Updated ${name} loot photo`)} />}
           {tab === "settlements" && <Settlements state={state} onSale={() => openSale()} />}
+          {tab === "statistics" && <Statistics state={state} />}
           {tab === "search" && <MemberSearch state={state} />}
         </div>
       </section>
@@ -488,6 +493,84 @@ function Dashboard({ state, inventory, totalStock, totalSales, salaryPaid, onRun
     <section className="panel recent"><div className="panel-head"><div><span className="panel-kicker">RECENT ACTIVITY</span><h2>Latest dungeon runs</h2></div></div><div className="table-wrap"><table><thead><tr><th>Dungeon</th><th>Date</th><th>Party</th><th>Loot types</th><th>Total units</th></tr></thead><tbody>{state.runs.slice(0, 5).map((run) => <tr key={run.id}><td><strong>{run.dungeon}</strong></td><td>{dateTime.format(new Date(run.createdAt))}</td><td>{run.memberIds.length} members</td><td>{run.loots.length}</td><td><b>{run.loots.reduce((sum, loot) => sum + loot.quantity, 0)}</b></td></tr>)}</tbody></table></div></section>
     <section className="panel audit-panel"><div className="panel-head"><div><span className="panel-kicker">AUDIT TRAIL</span><h2>Who changed the ledger</h2></div>{state.lastUpdatedBy && <span className="last-editor">Last updated by <strong>{state.lastUpdatedBy}</strong></span>}</div><div className="audit-list">{(state.auditLog ?? []).length === 0 ? <p>No updates recorded yet.</p> : state.auditLog.slice(0, 6).map((entry) => <div className="audit-row" key={entry.id}><span className="avatar">{entry.username.slice(0, 2).toUpperCase()}</span><div><strong>{entry.username}</strong><span>{entry.action}</span></div><time>{dateTime.format(new Date(entry.createdAt))}</time></div>)}</div></section>
   </>;
+}
+
+type StatisticsPeriod = "weekly" | "monthly" | "yearly";
+
+function Statistics({ state }: { state: LootState }) {
+  const [lootPeriod, setLootPeriod] = useState<StatisticsPeriod>("monthly");
+  const [now] = useState(() => new Date());
+  const today = useMemo(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()), [now]);
+  const pieColors = ["#6556d8", "#16836d", "#d79836", "#3f7fbc", "#e65555", "#8c65b8", "#42a88d", "#ce7a42", "#7893ce", "#b85c8a"];
+
+  const richestMembers = useMemo(() => state.members.map((member) => {
+    const paidSales = state.sales.filter((sale) => sale.recipientIds.includes(member.id));
+    const totalPaid = paidSales.reduce((sum, sale) => sum + (sale.recipientAmounts?.[member.id] ?? sale.salaryEach), 0);
+    return { id: member.id, name: member.name, totalPaid, payments: paidSales.length };
+  }).filter((member) => member.totalPaid > 0).sort((left, right) => right.totalPaid - left.totalPaid).slice(0, 5), [state.members, state.sales]);
+
+  const activeRunners = useMemo(() => state.members.map((member) => {
+    const runs = state.runs.filter((run) => run.memberIds.includes(member.id));
+    const latest = runs.reduce<Date | null>((current, run) => {
+      const runDate = new Date(run.createdAt);
+      return !current || runDate > current ? runDate : current;
+    }, null);
+    return { id: member.id, name: member.name, runs: runs.length, latest };
+  }).filter((member) => member.runs > 0).sort((left, right) => right.runs - left.runs || (right.latest?.getTime() ?? 0) - (left.latest?.getTime() ?? 0)).slice(0, 10), [state.members, state.runs]);
+
+  const frequentLoot = useMemo(() => {
+    const items = new Map<string, { name: string; appearances: number; quantity: number }>();
+    state.runs.forEach((run) => run.loots.forEach((loot) => {
+      const key = loot.name.trim().toLowerCase();
+      const item = items.get(key) ?? { name: loot.name.trim(), appearances: 0, quantity: 0 };
+      item.appearances += 1;
+      item.quantity += loot.quantity;
+      items.set(key, item);
+    }));
+    return [...items.values()].sort((left, right) => right.appearances - left.appearances || right.quantity - left.quantity).slice(0, 5);
+  }, [state.runs]);
+
+  const weeklyRuns = useMemo(() => Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today); date.setDate(today.getDate() - 6 + index);
+    return { label: date.toLocaleDateString("en", { weekday: "short" }), detail: date.toLocaleDateString("en", { month: "short", day: "numeric" }), runs: state.runs.filter((run) => localDateKey(new Date(run.createdAt)) === localDateKey(date)).length };
+  }), [state.runs, today]);
+
+  const monthlyRuns = useMemo(() => {
+    const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return Array.from({ length: days }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth(), index + 1);
+      return { label: String(index + 1), detail: date.toLocaleDateString("en", { month: "short", day: "numeric" }), runs: state.runs.filter((run) => localDateKey(new Date(run.createdAt)) === localDateKey(date)).length };
+    });
+  }, [state.runs, now]);
+
+  const yearlyRuns = useMemo(() => Array.from({ length: 12 }, (_, month) => ({
+    label: new Date(now.getFullYear(), month, 1).toLocaleDateString("en", { month: "short" }),
+    runs: state.runs.filter((run) => { const date = new Date(run.createdAt); return date.getFullYear() === now.getFullYear() && date.getMonth() === month; }).length,
+  })), [state.runs, now]);
+
+  const lootPie = useMemo(() => {
+    const start = lootPeriod === "weekly"
+      ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
+      : lootPeriod === "monthly"
+        ? new Date(now.getFullYear(), now.getMonth(), 1)
+        : new Date(now.getFullYear(), 0, 1);
+    const items = new Map<string, { name: string; value: number }>();
+    state.runs.filter((run) => { const date = new Date(run.createdAt); return date >= start && date <= now; }).forEach((run) => run.loots.forEach((loot) => {
+      const key = loot.name.trim().toLowerCase();
+      const item = items.get(key) ?? { name: loot.name.trim(), value: 0 };
+      item.value += loot.quantity;
+      items.set(key, item);
+    }));
+    return [...items.values()].sort((left, right) => right.value - left.value);
+  }, [lootPeriod, state.runs, now]);
+
+  const chart = (data: Array<{ label: string; runs: number }>) => <ResponsiveContainer width="100%" height={250}><BarChart data={data} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}><CartesianGrid stroke="#ece9e2" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" tick={{ fill: "#858a94", fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis allowDecimals={false} tick={{ fill: "#858a94", fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip cursor={{ fill: "#f0edff" }} contentStyle={{ border: "1px solid #e1ddd5", borderRadius: 9, fontSize: 11 }} /><Bar dataKey="runs" name="Dungeon runs" fill="#6556d8" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer>;
+
+  return <><PageTitle eyebrow="GUILD INSIGHTS" title="Statistics" text="See the strongest earners, most active runners, frequent loot, and dungeon activity over time." /><div className="stats-tables"><StatisticsTable title="Top 5 richest members" subtitle="Ranked by recorded paid salary" headers={["#", "Member", "Payments", "Total paid"]} rows={richestMembers.map((member, index) => [index + 1, member.name, member.payments, <PenyaAmount key={member.id} value={member.totalPaid} />])} empty="No paid salaries recorded yet." /><StatisticsTable title="Top 10 active runners" subtitle="Ranked by dungeon participation" headers={["#", "Member", "Runs", "Latest run"]} rows={activeRunners.map((member, index) => [index + 1, member.name, member.runs, member.latest ? member.latest.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—"])} empty="No dungeon participation recorded yet." /><StatisticsTable title="Top 5 frequent loot" subtitle="Ranked by appearances across dungeon runs" headers={["#", "Loot item", "Run drops", "Total units"]} rows={frequentLoot.map((loot, index) => [index + 1, loot.name, loot.appearances, loot.quantity.toLocaleString()])} empty="No loot has been recorded yet." /></div><div className="stats-charts"><section className="stats-panel weekly"><div className="stats-panel-head"><div><span>LAST 7 DAYS</span><h2>Weekly dungeon runs</h2></div></div>{chart(weeklyRuns)}</section><section className="stats-panel monthly"><div className="stats-panel-head"><div><span>{now.toLocaleDateString("en", { month: "long", year: "numeric" }).toUpperCase()}</span><h2>Monthly dungeon runs</h2></div></div>{chart(monthlyRuns)}</section><section className="stats-panel yearly"><div className="stats-panel-head"><div><span>{now.getFullYear()}</span><h2>Yearly dungeon runs</h2></div></div>{chart(yearlyRuns)}</section><section className="stats-panel loot-pie-panel"><div className="stats-panel-head"><div><span>LOOT DISTRIBUTION</span><h2>Loot units collected</h2></div><div className="period-switch" aria-label="Loot chart period">{(["weekly", "monthly", "yearly"] as StatisticsPeriod[]).map((period) => <button type="button" className={lootPeriod === period ? "active" : ""} key={period} onClick={() => setLootPeriod(period)}>{period}</button>)}</div></div>{lootPie.length === 0 ? <div className="stats-empty">No loot recorded in this period.</div> : <div className="pie-layout"><ResponsiveContainer width="100%" height={280}><PieChart><Pie data={lootPie} dataKey="value" nameKey="name" innerRadius={58} outerRadius={98} paddingAngle={2}>{lootPie.map((item, index) => <Cell key={item.name} fill={pieColors[index % pieColors.length]} />)}</Pie><Tooltip formatter={(value) => [Number(value).toLocaleString(), "Loot units"]} contentStyle={{ border: "1px solid #e1ddd5", borderRadius: 9, fontSize: 11 }} /></PieChart></ResponsiveContainer><div className="pie-legend">{lootPie.map((item, index) => <div key={item.name}><i style={{ background: pieColors[index % pieColors.length] }} /><span>{item.name}</span><strong>{item.value.toLocaleString()}</strong></div>)}</div></div>}</section></div></>;
+}
+
+function StatisticsTable({ title, subtitle, headers, rows, empty }: { title: string; subtitle: string; headers: string[]; rows: React.ReactNode[][]; empty: string }) {
+  return <section className="stats-panel stats-table"><div className="stats-panel-head"><div><span>LEADERBOARD</span><h2>{title}</h2><p>{subtitle}</p></div></div><div className="table-wrap"><table><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{rows.length === 0 ? <tr><td className="stats-table-empty" colSpan={headers.length}>{empty}</td></tr> : rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cellIndex === 1 ? <strong>{cell}</strong> : cell}</td>)}</tr>)}</tbody></table></div></section>;
 }
 
 function Metric({ icon, tone, label, value, note }: { icon: React.ReactNode; tone: string; label: string; value: React.ReactNode; note: string }) { return <article className="metric"><span className={`metric-icon ${tone}`}>{icon}</span><span>{label}</span><strong>{value}</strong><small>{note}</small></article>; }

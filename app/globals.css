@@ -143,6 +143,19 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .featured-members-public .character-slide img { object-position:center 24%; }
 .featured-members-public .character-caption { right:30px; bottom:82px; }
 .featured-members-public .character-controls { right:28px; bottom:26px; }
+.public-carousel-hero { position:relative; isolation:isolate; min-height:470px; overflow:hidden; margin-bottom:30px; border-radius:26px; color:#fff; background:radial-gradient(circle at 78% 30%,#54479455,transparent 40%),#11121d; box-shadow:0 24px 55px #22223826; }
+.public-carousel-hero>.featured-members-public { position:absolute; inset:0; width:100%; height:100%; margin:0; border:0; border-radius:inherit; background:transparent; box-shadow:none; }
+.public-carousel-hero .character-slide { background:transparent; }
+.public-carousel-hero .character-slide img { object-fit:contain; object-position:right center; }
+.public-carousel-hero .character-shade { background:linear-gradient(90deg,#0f101dfc 0%,#121322e8 37%,#12132275 66%,#11121d7d 100%),linear-gradient(0deg,#10111ed6 0%,transparent 58%); }
+.public-carousel-hero-content { position:relative; z-index:3; min-height:470px; display:flex; flex-direction:column; justify-content:flex-end; padding:48px clamp(34px,5vw,64px); pointer-events:none; }
+.public-carousel-hero-content .public-title { max-width:650px; margin-bottom:0; text-shadow:0 3px 24px #000b; }
+.public-carousel-hero-content .public-title>span { color:#d8b76d; }
+.public-carousel-hero-content .public-title h1 { color:#fff; }
+.public-carousel-hero-content .public-title p { color:#d2cfdb; font-size:13px; }
+.public-carousel-hero-content .public-search { width:min(100%,650px); max-width:650px; margin:26px 0 0; border-color:#ffffff52; background:#fffffff2; box-shadow:0 15px 38px #05050b52; pointer-events:auto; backdrop-filter:blur(12px); }
+.public-carousel-hero .shop-hero { margin-bottom:0; }
+.public-carousel-hero .shop-hero-icon { color:#fff; background:#6556d8cc; box-shadow:inset 0 0 0 1px #ffffff24,0 10px 30px #08081240; }
 .members-hero { display:flex; align-items:flex-start; gap:16px; margin-bottom:28px; }
 .members-hero .public-title { margin-bottom:0; }
 .members-hero-icon { display:grid; place-items:center; flex:0 0 54px; width:54px; height:54px; margin-top:2px; border-radius:16px; color:#6657d7; background:#ebe8ff; box-shadow:inset 0 0 0 1px #ddd7ff; }
@@ -176,6 +189,16 @@ button:disabled { cursor:not-allowed; opacity:.45; }
   .featured-members-public .character-caption strong { font-size:14px; }
   .featured-members-public .character-caption small { font-size:9px; }
   .featured-members-public .character-controls { right:17px; bottom:17px; }
+  .public-carousel-hero { min-height:430px; border-radius:20px; }
+  .public-carousel-hero>.featured-members-public { height:100%; margin:0; border-radius:inherit; }
+  .public-carousel-hero .character-slide img { object-position:center top; }
+  .public-carousel-hero .character-caption { top:24px; right:22px; bottom:auto; }
+  .public-carousel-hero .character-controls { top:74px; right:18px; bottom:auto; }
+  .public-carousel-hero-content { min-height:430px; padding:26px 22px; }
+  .public-carousel-hero-content .public-title { max-width:100%; }
+  .public-carousel-hero-content .public-title h1 { font-size:32px; }
+  .public-carousel-hero-content .public-title p { max-width:88%; font-size:11px; }
+  .public-carousel-hero-content .public-search { height:54px; margin-top:20px; }
   .featured-member-grid { gap:12px; }
   .featured-member-card { border-radius:16px; }
   .featured-member-card-copy { right:17px; bottom:17px; left:17px; }

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { ArrowRight, Coins, Gem, Search, ShieldCheck, Sparkles, Store, Users } from "lucide-react";
 import { FeaturedMembers } from "./components/featured-members";
 
@@ -23,9 +22,9 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return <main className="guild-landing">
     <header className="landing-header">
-      <Link className="landing-brand" href="/" aria-label="Stoics guild home"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>FLYFF UNIVERSE GUILD</small></div></Link>
-      <nav className="landing-nav" aria-label="Main navigation"><Link href="#about">About</Link><Link href="/members">Members</Link><Link href="/shop">Loot shop</Link><Link href="/inquiries">Inquiries</Link></nav>
-      <Link className="landing-login" href="/login"><ShieldCheck size={16} /> Manager login</Link>
+      <a className="landing-brand" href="/" aria-label="Stoics guild home"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>FLYFF UNIVERSE GUILD</small></div></a>
+      <nav className="landing-nav" aria-label="Main navigation"><a href="#about">About</a><a href="/members">Members</a><a href="/shop">Loot shop</a><a href="/inquiries">Inquiries</a></nav>
+      <a className="landing-login" href="/login"><ShieldCheck size={16} /> Manager login</a>
     </header>
 
     <section className="landing-hero">
@@ -33,15 +32,15 @@ export default function LandingPage() {
         <span className="landing-kicker"><Sparkles size={14} /> STOICS GUILD</span>
         <h1>Run as one.<br /><em>Share every reward.</em></h1>
         <p>Stoics is a Flyff Universe guild built around teamwork, memorable dungeon runs, and a transparent loot system that gives every member a fair share.</p>
-        <div className="landing-hero-actions"><Link className="landing-primary" href="/members">Meet our members <ArrowRight size={17} /></Link><Link className="landing-secondary" href="/shop"><Store size={17} /> Browse the loot shop</Link></div>
+        <div className="landing-hero-actions"><a className="landing-primary" href="/members">Meet our members <ArrowRight size={17} /></a><a className="landing-secondary" href="/shop"><Store size={17} /> Browse the loot shop</a></div>
         <div className="landing-pill-row"><span><ShieldCheck size={15} /> Fair payouts</span><span><Gem size={15} /> Shared loot</span><span><Users size={15} /> One guild</span></div>
       </div>
-      <div className="landing-carousel-wrap"><div className="landing-carousel-label"><span>THE PEOPLE OF STOICS</span><strong>Featured members</strong></div><FeaturedMembers variant="public" /></div>
+      <div className="landing-carousel-wrap"><FeaturedMembers variant="public" /></div>
     </section>
 
     <section className="landing-about" id="about">
       <div className="landing-emblem"><span><img src="/stoics-logo.webp" alt="Stoics guild logo" /></span><i /><i /><i /></div>
-      <div className="landing-about-copy"><span className="landing-section-kicker">ABOUT THE GUILD</span><h2>Strong parties are built on trust.</h2><p>Stoics brings players together for organized dungeon runs, shared progression, and fair distribution of every valuable drop. Our public ledger makes loot, vending prices, sales, and member payouts easy to follow.</p><p>Every run adds to the guild story. Every member helps write it.</p><Link href="/inquiries">Explore the public ledger <ArrowRight size={16} /></Link></div>
+      <div className="landing-about-copy"><span className="landing-section-kicker">ABOUT THE GUILD</span><h2>Strong parties are built on trust.</h2><p>Stoics brings players together for organized dungeon runs, shared progression, and fair distribution of every valuable drop. Our public ledger makes loot, vending prices, sales, and member payouts easy to follow.</p><p>Every run adds to the guild story. Every member helps write it.</p><a href="/inquiries">Explore the public ledger <ArrowRight size={16} /></a></div>
     </section>
 
     <section className="landing-values">
@@ -53,8 +52,8 @@ export default function LandingPage() {
       </div>
     </section>
 
-    <section className="landing-callout"><div><span>ENTER THE STOICS LEDGER</span><h2>See the guild in action.</h2><p>Meet the roster, check available loot, or look up member payouts.</p></div><div><Link href="/members"><Users size={17} /> Featured members</Link><Link href="/shop"><Store size={17} /> Loot shop</Link><Link href="/inquiries"><Search size={17} /> Public inquiries</Link></div></section>
+    <section className="landing-callout"><div><span>ENTER THE STOICS LEDGER</span><h2>See the guild in action.</h2><p>Meet the roster, check available loot, or look up member payouts.</p></div><div><a href="/members"><Users size={17} /> Featured members</a><a href="/shop"><Store size={17} /> Loot shop</a><a href="/inquiries"><Search size={17} /> Public inquiries</a></div></section>
 
-    <footer className="landing-footer"><div className="landing-footer-brand"><img src="/stoics-logo.webp" alt="" /><div><strong>STOICS</strong><span>Run as one. Share every reward.</span></div></div><nav aria-label="Footer navigation"><Link href="/">Home</Link><Link href="/members">Featured members</Link><Link href="/shop">Loot shop</Link><Link href="/inquiries">Public inquiries</Link><Link href="/login">Manager login</Link></nav><p>Website created by <strong>Kevin Loquencio</strong></p></footer>
+    <footer className="landing-footer"><div className="landing-footer-brand"><img src="/stoics-logo.webp" alt="" /><div><strong>STOICS</strong><span>Run as one. Share every reward.</span></div></div><nav aria-label="Footer navigation"><a href="/">Home</a><a href="/members">Featured members</a><a href="/shop">Loot shop</a><a href="/inquiries">Public inquiries</a><a href="/login">Manager login</a></nav><p>Website created by <strong>Kevin Loquencio</strong></p></footer>
   </main>;
 }

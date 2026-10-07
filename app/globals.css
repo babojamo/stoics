@@ -190,7 +190,7 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-brand>span { width:48px; height:48px; overflow:hidden; border:1px solid #ffffff26; border-radius:14px; background:#242434; box-shadow:0 8px 24px #0006; }
 .landing-brand img { display:block; width:100%; height:100%; object-fit:cover; }
 .landing-brand div { display:grid; gap:3px; }
-.landing-brand strong { font:700 17px Georgia,serif; letter-spacing:.12em; }
+.landing-brand strong { font:700 17px "Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:.12em; }
 .landing-brand small { color:#a6a5b5; font-size:7px; font-weight:800; letter-spacing:.16em; }
 .landing-nav { display:flex; justify-content:center; align-items:center; gap:clamp(18px,2.5vw,38px); }
 .landing-nav a { color:#c5c3d0; font-size:11px; font-weight:700; text-decoration:none; transition:color .2s; }
@@ -200,7 +200,7 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-hero::before { position:absolute; z-index:-1; inset:0; content:""; opacity:.38; background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px); background-size:72px 72px; mask-image:linear-gradient(90deg,#000,transparent 66%); }
 .landing-hero-copy { max-width:650px; }
 .landing-kicker { display:inline-flex; align-items:center; gap:8px; color:#d8b76d; font-size:10px; font-weight:900; letter-spacing:.18em; }
-.landing-hero h1 { margin:21px 0 24px; font:500 clamp(52px,5.8vw,88px)/.98 Georgia,serif; letter-spacing:-.045em; }
+.landing-hero h1 { margin:21px 0 24px; font:600 clamp(52px,5.8vw,88px)/.98 "Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:-.045em; }
 .landing-hero h1 em { color:#a99df6; font-style:normal; }
 .landing-hero-copy>p { max-width:610px; margin:0; color:#c6c3d2; font-size:17px; line-height:1.75; }
 .landing-hero-actions { display:flex; flex-wrap:wrap; gap:11px; margin-top:32px; }
@@ -211,10 +211,7 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-pill-row span { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:700; }
 .landing-pill-row svg { color:#9b8fea; }
 .landing-carousel-wrap { min-width:0; }
-.landing-carousel-label { display:flex; align-items:end; justify-content:space-between; gap:18px; margin:0 3px 13px; }
-.landing-carousel-label span { color:#d8b76d; font-size:8px; font-weight:900; letter-spacing:.16em; }
-.landing-carousel-label strong { font-size:13px; }
-.landing-carousel-wrap .featured-members-public { height:520px; margin:0; border-color:#ffffff26; box-shadow:0 28px 70px #05050a80; }
+.landing-carousel-wrap .featured-members-public { height:520px; margin:0; border:0; border-radius:0; box-shadow:none; }
 .landing-carousel-wrap .featured-members-public .character-slide img { object-position:center 22%; }
 .landing-about { display:grid; grid-template-columns:minmax(300px,.72fr) minmax(0,1.28fr); align-items:center; gap:clamp(55px,8vw,130px); max-width:1280px; margin:0 auto; padding:110px clamp(26px,6vw,82px); }
 .landing-emblem { position:relative; isolation:isolate; width:min(100%,390px); aspect-ratio:1; display:grid; place-items:center; margin:auto; }
@@ -225,7 +222,7 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-emblem i:nth-of-type(3) { inset:19%; border-color:#d8b76d50; }
 @keyframes landing-spin { to { transform:rotate(360deg); } }
 .landing-section-kicker { color:#6556d8; font-size:9px; font-weight:900; letter-spacing:.18em; }
-.landing-about-copy h2,.landing-section-heading h2 { margin:12px 0 19px; font:500 clamp(36px,4vw,56px)/1.05 Georgia,serif; letter-spacing:-.035em; }
+.landing-about-copy h2,.landing-section-heading h2 { margin:12px 0 19px; font:600 clamp(36px,4vw,56px)/1.05 "Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:-.035em; }
 .landing-about-copy p { max-width:690px; margin:0 0 15px; color:#6f7480; font-size:15px; line-height:1.75; }
 .landing-about-copy a { display:inline-flex; align-items:center; gap:7px; margin-top:8px; color:#5b4fc3; font-size:12px; font-weight:900; text-decoration:none; }
 .landing-values { padding:94px clamp(26px,7vw,118px) 108px; background:#eeece6; }
@@ -234,11 +231,11 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-value-grid { max-width:1280px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:0 auto; }
 .landing-value-grid article { min-height:230px; padding:30px; border:1px solid #dedad1; border-radius:20px; background:#f9f8f4; box-shadow:0 10px 28px #34313b09; }
 .landing-value-grid article>span { width:48px; height:48px; display:grid; place-items:center; border-radius:14px; color:#6657d7; background:#e9e5ff; }
-.landing-value-grid h3 { margin:25px 0 9px; font:600 21px Georgia,serif; }
+.landing-value-grid h3 { margin:25px 0 9px; font:600 21px "Google Sans","Segoe UI",Arial,sans-serif; }
 .landing-value-grid p { margin:0; color:#777c86; font-size:12px; line-height:1.7; }
 .landing-callout { max-width:1280px; display:flex; align-items:center; justify-content:space-between; gap:36px; margin:90px auto; padding:46px clamp(28px,5vw,66px); border-radius:24px; color:#fff; background:radial-gradient(circle at 85% 10%,#8b7ce950,transparent 35%),linear-gradient(130deg,#171827,#282143); box-shadow:0 24px 60px #27223f26; }
 .landing-callout>div:first-child>span { color:#d8b76d; font-size:8px; font-weight:900; letter-spacing:.17em; }
-.landing-callout h2 { margin:8px 0 6px; font:500 35px Georgia,serif; }
+.landing-callout h2 { margin:8px 0 6px; font:600 35px "Google Sans","Segoe UI",Arial,sans-serif; }
 .landing-callout p { margin:0; color:#bcb9ca; font-size:12px; }
 .landing-callout>div:last-child { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
 .landing-callout a { min-height:42px; display:inline-flex; align-items:center; gap:7px; padding:0 14px; border:1px solid #ffffff2c; border-radius:10px; color:#fff; background:#ffffff0b; font-size:10px; font-weight:800; text-decoration:none; }
@@ -246,7 +243,7 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-footer-brand { display:flex; align-items:center; gap:12px; }
 .landing-footer-brand img { width:50px; height:50px; border-radius:14px; }
 .landing-footer-brand div { display:grid; gap:4px; }
-.landing-footer-brand strong { color:#fff; font:700 17px Georgia,serif; letter-spacing:.11em; }
+.landing-footer-brand strong { color:#fff; font:700 17px "Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:.11em; }
 .landing-footer-brand span { font-size:9px; }
 .landing-footer nav { display:flex; flex-wrap:wrap; justify-content:center; gap:22px; }
 .landing-footer nav a { color:#cfccd8; font-size:10px; font-weight:700; text-decoration:none; }

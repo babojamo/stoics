@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CircleCheck, Gem, LoaderCircle, Search, ShieldCheck, Store, Users, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { PenyaAmount } from "../components/penya";
+import { FeaturedMembers } from "../components/featured-members";
 
 type ShopItem = { name: string; vendingPrice: number; available: number; image?: string };
 
@@ -55,6 +56,7 @@ export default function ShopPage() {
     </header>
     <section className="public-inquiries-content">
       <div className="shop-hero"><div className="shop-hero-icon"><Store size={26} /></div><div className="public-title"><span>STOICS PUBLIC SHOP</span><h1>Dungeon loot & vending prices</h1><p>Browse available Stoics loot and check the latest vending price for every item.</p></div></div>
+      <FeaturedMembers variant="public" />
       <div className="member-search-bar public-search shop-search"><Search size={20} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search loot by name..." />{loading ? <LoaderCircle className="spin" size={18} /> : query && <button aria-label="Clear search" onClick={() => setQuery("")}><X size={16} /></button>}</div>
       {error ? <div className="search-welcome error-state"><Store size={28} /><h2>Shop unavailable</h2><p>{error}</p></div> : loading ? <div className="search-welcome"><LoaderCircle className="spin" size={28} /><h2>Loading the shop</h2><p>Checking the latest loot and vending prices.</p></div> : <><div className="shop-results-heading"><strong>{filteredItems.length} {filteredItems.length === 1 ? "loot item" : "loot items"}</strong><span>Prices are set by the Stoics loot managers.</span></div>{filteredItems.length === 0 ? <div className="search-welcome"><Search size={28} /><h2>No loot found</h2><p>Try another loot item name.</p></div> : <div className="shop-grid">{filteredItems.map((item) => { const priceTier = item.vendingPrice >= 1_000_000_000 ? "price-billion" : item.vendingPrice >= 100_000_000 ? "price-high" : "price-standard"; return <article className={`shop-card ${item.available === 0 ? "sold-out" : ""}`} key={item.name}><div className={`shop-card-icon ${item.image ? "has-image" : ""}`}>{item.image ? <img src={item.image} alt={`${item.name} loot item`} /> : <Gem size={21} />}</div><div className="shop-card-name"><span>Loot item</span><h2>{item.name}</h2>{item.available === 0 ? <small className="shop-sold-out">SOLD OUT</small> : <small className="shop-in-stock"><CircleCheck size={13} />{item.available.toLocaleString()} {item.available === 1 ? "unit" : "units"} available</small>}</div><div className="shop-card-price"><span>Vending price</span>{item.vendingPrice > 0 ? <strong className={priceTier}><PenyaAmount value={item.vendingPrice} /></strong> : <strong className="price-pending">Price pending</strong>}<small>per item</small></div></article>; })}</div>}</>}
     </section>

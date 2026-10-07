@@ -687,12 +687,13 @@ function RunModal({ state, run, currentUser, onClose, onSave }: { state: LootSta
 
 function SaleModal({ state, inventory, initialLootName: requestedLootName, currentUser, onClose, onSave }: { state: LootState; inventory: ReturnType<typeof inventoryFor>; initialLootName?: string; currentUser: string; onClose: () => void; onSave: (state: LootState) => void }) {
   const available = inventory.filter((item) => item.available > 0);
-  const initialLootName = available.find((item) => item.name.toLowerCase() === requestedLootName?.toLowerCase())?.name ?? available[0]?.name ?? "";
-  const initialQuantity = available[0]?.available ?? 1;
+  const initialItem = available.find((item) => item.name.toLowerCase() === requestedLootName?.toLowerCase()) ?? available[0];
+  const initialLootName = initialItem?.name ?? "";
+  const initialQuantity = initialItem?.available ?? 1;
   const [lootName, setLootName] = useState(initialLootName);
   const stock = available.find((item) => item.name === lootName);
   const [quantity, setQuantity] = useState(initialQuantity);
-  const [unitPrice, setUnitPrice] = useState(available[0]?.vendingAmount ?? 0);
+  const [unitPrice, setUnitPrice] = useState(initialItem?.vendingAmount ?? 0);
   const eligibleIds = useMemo(() => eligibleMembersForSale(state, lootName, quantity), [state, lootName, quantity]);
   const [recipients, setRecipients] = useState<string[]>(() => eligibleMembersForSale(state, initialLootName, initialQuantity));
   const [mailRecipientId, setMailRecipientId] = useState(recipients[0] ?? "");

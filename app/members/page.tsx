@@ -5,11 +5,11 @@ import { featuredMembers } from "../components/featured-members-data";
 export default function MembersPage() {
   return <main className="public-inquiries featured-members-page">
     <header className="public-inquiries-header">
-      <Link className="public-brand" href="/" aria-label="Open Stoics Loot Ledger manager login"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>FEATURED MEMBERS</small></div></Link>
+      <Link className="public-brand" href="/" aria-label="Open Stoics guild home"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>FEATURED MEMBERS</small></div></Link>
       <nav className="public-header-actions" aria-label="Public pages">
         <Link className="manager-link" href="/shop"><Store size={16} /><span className="public-nav-label">Loot shop</span></Link>
         <Link className="manager-link" href="/inquiries"><Search size={16} /><span className="public-nav-label">Inquiries</span></Link>
-        <Link className="manager-link" href="/"><ShieldCheck size={16} /><span className="public-nav-label">Manager login</span></Link>
+        <Link className="manager-link" href="/login"><ShieldCheck size={16} /><span className="public-nav-label">Manager login</span></Link>
       </nav>
     </header>
     <section className="public-inquiries-content featured-members-content">

@@ -55,6 +55,9 @@ const loginCharacters = [
   { name: "Aula", role: "Arcanist", image: "/characters/aula-arcanist.webp" },
   { name: "Disinfectant", role: "Arcanist", image: "/characters/disinfectant-arcanist.webp" },
   { name: "meowmeow23", role: "Ring Master", image: "/characters/meowmeow23-ring-master.webp" },
+  { name: "Schizooo", role: "Forcemaster", image: "/characters/schizooo-forcemaster.webp" },
+  { name: "Blood", role: "Harlequin", image: "/characters/blood-harlequin.webp" },
+  { name: "Matookz", role: "Crackshooter", image: "/characters/matookz-crackshooter.webp" },
 ];
 
 function toDateTimeLocalValue(date: Date) {

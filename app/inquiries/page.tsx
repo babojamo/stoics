@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoaderCircle, Search, ShieldCheck, Store, X } from "lucide-react";
+import { LoaderCircle, Search, ShieldCheck, Sparkles, Store, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { PenyaAmount } from "../components/penya";
 import { FeaturedMembers } from "../components/featured-members";
@@ -54,7 +54,7 @@ export default function InquiriesPage() {
   const openManagerLogin = () => window.location.assign("/");
 
   return <main className="public-inquiries">
-    <header className="public-inquiries-header"><button type="button" className="public-brand" onClick={openManagerLogin} aria-label="Open Stoics Loot Ledger manager login"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>LOOT LEDGER</small></div></button><div className="public-header-actions"><button type="button" className="manager-link" onClick={() => window.location.assign("/shop")}><Store size={16} /> Loot shop</button><button type="button" className="manager-link" onClick={openManagerLogin}><ShieldCheck size={16} /> Manager login</button></div></header>
+    <header className="public-inquiries-header"><button type="button" className="public-brand" onClick={openManagerLogin} aria-label="Open Stoics Loot Ledger manager login"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>LOOT LEDGER</small></div></button><div className="public-header-actions"><button type="button" className="manager-link" onClick={() => window.location.assign("/members")}><Sparkles size={16} /> <span className="public-nav-label">Featured members</span></button><button type="button" className="manager-link" onClick={() => window.location.assign("/shop")}><Store size={16} /> <span className="public-nav-label">Loot shop</span></button><button type="button" className="manager-link" onClick={openManagerLogin}><ShieldCheck size={16} /> <span className="public-nav-label">Manager login</span></button></div></header>
     <section className="public-inquiries-content">
       <div className="public-title"><span>PUBLIC INQUIRIES</span><h1>Search members & loot</h1><p>Review pending loot, paid loot, and the total amount paid to each member.</p></div>
       <FeaturedMembers variant="public" />

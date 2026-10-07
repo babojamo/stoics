@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CircleCheck, Gem, LoaderCircle, Search, ShieldCheck, Store, Users, X } from "lucide-react";
+import { CircleCheck, Gem, LoaderCircle, Search, ShieldCheck, Sparkles, Store, Users, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { PenyaAmount } from "../components/penya";
 import { FeaturedMembers } from "../components/featured-members";
@@ -52,7 +52,7 @@ export default function ShopPage() {
   return <main className="public-inquiries public-shop">
     <header className="public-inquiries-header">
       <button type="button" className="public-brand" onClick={() => window.location.assign("/")} aria-label="Open Stoics Loot Ledger manager login"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>LOOT SHOP</small></div></button>
-      <div className="public-header-actions"><button type="button" className="manager-link" onClick={() => window.location.assign("/inquiries")}><Users size={16} /> Member inquiries</button><button type="button" className="manager-link" onClick={() => window.location.assign("/")}><ShieldCheck size={16} /> Manager login</button></div>
+      <div className="public-header-actions"><button type="button" className="manager-link" onClick={() => window.location.assign("/members")}><Sparkles size={16} /> <span className="public-nav-label">Featured members</span></button><button type="button" className="manager-link" onClick={() => window.location.assign("/inquiries")}><Users size={16} /> <span className="public-nav-label">Member inquiries</span></button><button type="button" className="manager-link" onClick={() => window.location.assign("/")}><ShieldCheck size={16} /> <span className="public-nav-label">Manager login</span></button></div>
     </header>
     <section className="public-inquiries-content">
       <div className="shop-hero"><div className="shop-hero-icon"><Store size={26} /></div><div className="public-title"><span>STOICS PUBLIC SHOP</span><h1>Dungeon loot & vending prices</h1><p>Browse available Stoics loot and check the latest vending price for every item.</p></div></div>

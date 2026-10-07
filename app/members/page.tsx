@@ -1,0 +1,26 @@
+import Link from "next/link";
+import { Search, ShieldCheck, Sparkles, Store } from "lucide-react";
+import { featuredMembers } from "../components/featured-members-data";
+
+export default function MembersPage() {
+  return <main className="public-inquiries featured-members-page">
+    <header className="public-inquiries-header">
+      <Link className="public-brand" href="/" aria-label="Open Stoics Loot Ledger manager login"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>FEATURED MEMBERS</small></div></Link>
+      <nav className="public-header-actions" aria-label="Public pages">
+        <Link className="manager-link" href="/shop"><Store size={16} /><span className="public-nav-label">Loot shop</span></Link>
+        <Link className="manager-link" href="/inquiries"><Search size={16} /><span className="public-nav-label">Inquiries</span></Link>
+        <Link className="manager-link" href="/"><ShieldCheck size={16} /><span className="public-nav-label">Manager login</span></Link>
+      </nav>
+    </header>
+    <section className="public-inquiries-content featured-members-content">
+      <div className="members-hero"><span className="members-hero-icon"><Sparkles size={26} /></span><div className="public-title"><span>STOICS GUILD</span><h1>Featured members</h1><p>Meet the Stoics members featured across the loot ledger.</p></div></div>
+      <div className="featured-member-grid">
+        {featuredMembers.map((member) => <article className="featured-member-card" key={member.name}>
+          <img src={member.image} alt={`${member.name}, ${member.role}`} />
+          <div className="featured-member-card-shade" />
+          <div className="featured-member-card-copy"><span>Featured member</span><h2>{member.name}</h2><p>{member.role}</p></div>
+        </article>)}
+      </div>
+    </section>
+  </main>;
+}

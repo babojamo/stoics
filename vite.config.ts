@@ -62,6 +62,15 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    build: {
+      rollupOptions: {
+        output: {
+          // Bump the shared chunk signature after a deployment-time asset miss
+          // so browsers do not reuse a cached failed dynamic import.
+          banner: "/* stoics-assets-2026-10-08 */",
+        },
+      },
+    },
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }

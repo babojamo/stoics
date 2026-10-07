@@ -4,19 +4,25 @@ import { FeaturedMembers } from "./components/featured-members";
 
 export const metadata: Metadata = {
   title: "Stoics Guild | Flyff Universe Dungeon Community",
-  description: "Meet the Stoics Flyff Universe guild, explore our featured members, browse dungeon loot, and follow our fair, transparent payout system.",
+  description: "Stoics is a Flyff Universe guild built around teamwork, memorable dungeon runs, and a transparent loot system that gives every member a fair share.",
   keywords: ["Stoics guild", "Flyff Universe guild", "Flyff dungeon community", "guild loot ledger", "Flyff featured members"],
   alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
   openGraph: {
     type: "website",
     locale: "en_PH",
     url: "/",
     siteName: "Stoics Guild",
     title: "Stoics Guild | Run as one. Share every reward.",
-    description: "Meet the Stoics Flyff Universe guild, our featured members, dungeon loot shop, and transparent reward system.",
-    images: [{ url: "/stoics-logo.webp", width: 1024, height: 1024, alt: "Stoics guild emblem" }],
+    description: "Stoics is a Flyff Universe guild built around teamwork, memorable dungeon runs, and a transparent loot system that gives every member a fair share.",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Gwingarcia, featured member of the Stoics Flyff Universe guild" }],
   },
-  twitter: { card: "summary_large_image", title: "Stoics Guild", description: "Run as one. Share every reward.", images: ["/stoics-logo.webp"] },
+  twitter: {
+    card: "summary_large_image",
+    title: "Stoics Guild | Run as one. Share every reward.",
+    description: "Stoics is a Flyff Universe guild built around teamwork, memorable dungeon runs, and a transparent loot system that gives every member a fair share.",
+    images: ["/opengraph-image"],
+  },
 };
 
 export default function LandingPage() {

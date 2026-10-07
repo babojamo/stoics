@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 const managedHostname = "stoics-loots.kevinloquencio.chatgpt.site";
-const publicOrigin = "https://stoics-loots.lokwensio.com";
+const publicOrigin = "https://stoics.lokwensio.com";
 
 export const metadata: Metadata = {
   title: "Stoics Loots — Flyff Universe Loot Ledger",

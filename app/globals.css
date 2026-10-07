@@ -192,10 +192,10 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-brand div { display:grid; gap:3px; }
 .landing-brand strong { font:700 17px "Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:.12em; }
 .landing-brand small { color:#a6a5b5; font-size:7px; font-weight:800; letter-spacing:.16em; }
-.landing-nav { display:flex; justify-content:center; align-items:center; gap:clamp(18px,2.5vw,38px); }
-.landing-nav a { color:#c5c3d0; font-size:11px; font-weight:700; text-decoration:none; transition:color .2s; }
+.landing-nav { display:flex; justify-content:center; align-items:center; gap:clamp(22px,2.8vw,44px); }
+.landing-nav a { color:#c5c3d0; font-size:14px; font-weight:700; text-decoration:none; transition:color .2s; }
 .landing-nav a:hover { color:#fff; }
-.landing-login { min-height:42px; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:0 16px; border:1px solid #8173e0; border-radius:11px; color:#fff; background:#6556d8; box-shadow:0 8px 25px #493ca84d; font-size:11px; font-weight:800; text-decoration:none; }
+.landing-login { min-height:46px; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:0 19px; border:1px solid #8173e0; border-radius:11px; color:#fff; background:#6556d8; box-shadow:0 8px 25px #493ca84d; font-size:13px; font-weight:800; text-decoration:none; }
 .landing-hero { position:relative; isolation:isolate; min-height:720px; display:grid; grid-template-columns:minmax(0,.88fr) minmax(520px,1.12fr); align-items:center; gap:clamp(44px,5vw,84px); padding:76px clamp(28px,7vw,118px) 86px; color:#fff; background:radial-gradient(circle at 16% 15%,#6958d842,transparent 31%),radial-gradient(circle at 93% 85%,#d49a3730,transparent 28%),linear-gradient(145deg,#11121d 0%,#1d1b33 54%,#12131e 100%); }
 .landing-hero::before { position:absolute; z-index:-1; inset:0; content:""; opacity:.38; background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px); background-size:72px 72px; mask-image:linear-gradient(90deg,#000,transparent 66%); }
 .landing-hero-copy { max-width:650px; }
@@ -248,8 +248,8 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-footer-brand div { display:grid; gap:4px; }
 .landing-footer-brand strong { color:#fff; font:700 17px "Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:.11em; }
 .landing-footer-brand span { font-size:9px; }
-.landing-footer nav { display:flex; flex-wrap:wrap; justify-content:center; gap:22px; }
-.landing-footer nav a { color:#cfccd8; font-size:10px; font-weight:700; text-decoration:none; }
+.landing-footer nav { display:flex; flex-wrap:wrap; justify-content:center; gap:clamp(20px,2vw,30px); }
+.landing-footer nav a { color:#cfccd8; font-size:13px; font-weight:700; text-decoration:none; }
 .landing-footer>p { margin:0; justify-self:end; font-size:10px; }
 .landing-footer>p strong { color:#fff; }
 @media (max-width:1050px) { .landing-hero { min-height:0; grid-template-columns:1fr; padding-top:66px; }.landing-hero-copy { max-width:780px; }.landing-carousel-wrap .featured-members-public { height:560px; }.landing-footer { grid-template-columns:1fr; text-align:center; }.landing-footer-brand,.landing-footer>p { justify-self:center; } }

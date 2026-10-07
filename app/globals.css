@@ -139,7 +139,7 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .character-dots { display:flex; align-items:center; gap:6px; }
 .character-dots button { width:7px; height:7px; padding:0; border:0; border-radius:50%; background:#ffffff66; transition:width .2s,background .2s; }
 .character-dots button.active { width:22px; border-radius:999px; background:#d8b76d; }
-.character-carousel.featured-members-public { position:relative; inset:auto; width:min(100%,760px); height:320px; margin:-8px 0 28px; border:1px solid #292a3d; border-radius:20px; box-shadow:0 15px 36px #2021321f; }
+.character-carousel.featured-members-public { position:relative; inset:auto; width:100%; height:320px; margin:-8px 0 28px; border:1px solid #292a3d; border-radius:20px; box-shadow:0 15px 36px #2021321f; }
 .featured-members-public .character-slide img { object-position:center 24%; }
 .featured-members-public .character-caption { right:30px; bottom:82px; }
 .featured-members-public .character-controls { right:28px; bottom:26px; }

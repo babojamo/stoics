@@ -5,6 +5,7 @@ import {
   Archive,
   BarChart3,
   Check,
+  ChevronLeft,
   ChevronRight,
   Coins,
   Copy,
@@ -49,6 +50,12 @@ const dateTime = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeri
 const makeId = () => crypto.randomUUID();
 const cloneSeed = () => JSON.parse(JSON.stringify(defaultState)) as LootState;
 const localDateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+const loginCharacters = [
+  { name: "Germicide", role: "Templar", image: "/characters/germicide-templar.webp" },
+  { name: "Aula", role: "Arcanist", image: "/characters/aula-arcanist.webp" },
+  { name: "Disinfectant", role: "Arcanist", image: "/characters/disinfectant-arcanist.webp" },
+  { name: "meowmeow23", role: "Ring Master", image: "/characters/meowmeow23-ring-master.webp" },
+];
 
 function toDateTimeLocalValue(date: Date) {
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -523,9 +530,43 @@ export default function Home() {
   );
 }
 
+function CharacterCarousel() {
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const pointerStart = useRef<number | null>(null);
+  const show = useCallback((index: number) => setActive((index + loginCharacters.length) % loginCharacters.length), []);
+
+  useEffect(() => {
+    if (paused) return;
+    const timer = window.setInterval(() => setActive((current) => (current + 1) % loginCharacters.length), 6500);
+    return () => window.clearInterval(timer);
+  }, [paused]);
+
+  const finishSwipe = (clientX: number) => {
+    if (pointerStart.current === null) return;
+    const distance = clientX - pointerStart.current;
+    pointerStart.current = null;
+    if (Math.abs(distance) < 45) return;
+    show(active + (distance < 0 ? 1 : -1));
+  };
+
+  return <div className="character-carousel" onPointerEnter={() => setPaused(true)} onPointerLeave={() => { pointerStart.current = null; setPaused(false); }} onPointerDown={(event) => { pointerStart.current = event.clientX; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={(event) => finishSwipe(event.clientX)} onPointerCancel={() => { pointerStart.current = null; }}>
+    <div className="character-track" style={{ transform: `translateX(-${active * 100}%)` }}>
+      {loginCharacters.map((character) => <figure className="character-slide" key={character.image}><img src={character.image} alt={`${character.name}, ${character.role}`} draggable={false} /></figure>)}
+    </div>
+    <div className="character-shade" />
+    <div className="character-caption"><span>Featured member</span><strong>{loginCharacters[active].name}</strong><small>{loginCharacters[active].role}</small></div>
+    <div className="character-controls">
+      <button type="button" onClick={(event) => { event.stopPropagation(); show(active - 1); }} aria-label="Previous character"><ChevronLeft size={18} /></button>
+      <div className="character-dots" aria-label="Choose featured character">{loginCharacters.map((character, index) => <button type="button" className={index === active ? "active" : ""} aria-label={`Show ${character.name}`} aria-current={index === active ? "true" : undefined} onClick={(event) => { event.stopPropagation(); show(index); }} key={character.name} />)}</div>
+      <button type="button" onClick={(event) => { event.stopPropagation(); show(active + 1); }} aria-label="Next character"><ChevronRight size={18} /></button>
+    </div>
+  </div>;
+}
+
 function Login({ credentials, setCredentials, submit, busy, error }: { credentials: { username: string; password: string }; setCredentials: React.Dispatch<React.SetStateAction<{ username: string; password: string }>>; submit: (event: React.FormEvent) => void; busy: boolean; error: string }) {
   return <main className="login-page">
-    <section className="login-visual"><div className="visual-glow" /><Logo /><div className="login-copy"><span className="eyebrow">DUNGEON OPERATIONS</span><h1>Every drop tracked.<br />Every member paid.</h1><p>Turn party screenshots into a clean loot ledger, then settle every sale with a fair, transparent payout queue.</p></div><div className="loot-orbit one"><Gem size={28} /></div><div className="loot-orbit two"><Coins size={24} /></div></section>
+    <section className="login-visual"><CharacterCarousel /><div className="login-visual-content"><Logo /><div className="login-copy"><span className="eyebrow">DUNGEON OPERATIONS</span><h1>Every drop tracked.<br />Every member paid.</h1><p>Turn party screenshots into a clean loot ledger, then settle every sale with a fair, transparent payout queue.</p></div></div></section>
     <section className="login-panel"><form onSubmit={submit} className="login-card"><span className="login-icon"><ShieldCheck size={24} /></span><h2>Manager access</h2><p>Sign in with your manager username and password. Every update is attributed to your account.</p><label>Username<input autoFocus autoComplete="username" value={credentials.username} onChange={(e) => setCredentials((c) => ({ ...c, username: e.target.value }))} placeholder="Enter your username" /></label><label>Password<input type="password" autoComplete="current-password" value={credentials.password} onChange={(e) => setCredentials((c) => ({ ...c, password: e.target.value }))} placeholder="Enter your password" /></label>{error && <div className="form-error">{error}</div>}<button className="primary login-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}{busy ? "Checking…" : "Enter loot ledger"}</button><button type="button" className="public-inquiries-link" onClick={() => window.location.assign("/inquiries")}><Search size={15} /> Open public inquiries</button><button type="button" className="public-inquiries-link" onClick={() => window.location.assign("/shop")}><Store size={15} /> Open public loot shop</button><small>Credentials are verified securely · Session stored in an HTTP-only cookie</small></form></section>
   </main>;
 }

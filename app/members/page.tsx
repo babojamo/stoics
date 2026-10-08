@@ -1,6 +1,11 @@
 import { Search, ShieldCheck, Sparkles, Store } from "lucide-react";
 import { featuredMembers } from "../components/featured-members-data";
 
+const membersPageMembers = [
+  ...featuredMembers.filter((member) => member.name === "Gwingarcia"),
+  ...featuredMembers.filter((member) => member.name !== "Gwingarcia"),
+];
+
 export default function MembersPage() {
   return <main className="public-inquiries featured-members-page">
     <header className="public-inquiries-header">
@@ -14,7 +19,7 @@ export default function MembersPage() {
     <section className="public-inquiries-content featured-members-content">
       <div className="members-hero"><span className="members-hero-icon"><Sparkles size={26} /></span><div className="public-title"><span>STOICS GUILD</span><h1>Featured members</h1><p>Meet the Stoics members featured across the loot ledger.</p></div></div>
       <div className="featured-member-grid">
-        {featuredMembers.map((member) => <article className="featured-member-card" key={member.name}>
+        {membersPageMembers.map((member) => <article className="featured-member-card" key={member.name}>
           <img src={member.image} alt={`${member.name}, ${member.role}`} />
           <div className="featured-member-card-shade" />
           <div className="featured-member-card-copy"><span>Featured member</span><h2>{member.name}</h2><p>{member.role}</p></div>

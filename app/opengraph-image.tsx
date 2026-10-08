@@ -68,7 +68,7 @@ export default function OpenGraphImage() {
       >
         <span style={{ color: "#e2c577", fontSize: 11, fontWeight: 800, letterSpacing: 2 }}>FEATURED MEMBER</span>
         <strong style={{ marginTop: 3, fontSize: 24 }}>Gwingarcia</strong>
-        <span style={{ color: "#d4d1df", fontSize: 14 }}>Seraph</span>
+        <span style={{ color: "#d4d1df", fontSize: 14 }}>Guild Leader - Seraph</span>
       </div>
     </div>,
     size,

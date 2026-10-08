@@ -14,4 +14,12 @@ export const featuredMembers = [
   { name: "Jazaniah", role: "Jester", image: "/characters/jazaniah-jester.png" },
   { name: "lordberus", role: "Forcemaster", image: "/characters/lordberus-forcemaster.png" },
   { name: "K I D P L A Y", role: "Crackshooter", image: "/characters/kidplay-crackshooter.png" },
+  { name: "J0shie", role: "Crackshooter", image: "/characters/j0shie-crackshooter.webp" },
+  { name: "Grogiee2", role: "Templar", image: "/characters/grogiee2-templar.webp" },
+  { name: "Yhoona", role: "Crackshooter", image: "/characters/yhoona-crackshooter.webp" },
+  { name: "AlijahAcs", role: "Slayer", image: "/characters/alijahacs-slayer.webp" },
+  { name: "19sUn68", role: "Mentalist", image: "/characters/19sun68-mentalist.webp" },
+  { name: "risheeL", role: "Seraph", image: "/characters/risheel-seraph.webp" },
+  { name: "KOB", role: "Templar", image: "/characters/kob-templar.webp" },
+  { name: "Saira", role: "Crackshooter", image: "/characters/saira-crackshooter.webp" },
 ] as const;

@@ -226,7 +226,7 @@ button:disabled { cursor:not-allowed; opacity:.45; }
 .landing-nav a:hover { color:#fff; }
 .landing-login { min-height:46px; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:0 19px; border:1px solid #8173e0; border-radius:11px; color:#fff; background:#6556d8; box-shadow:0 8px 25px #493ca84d; font-size:13px; font-weight:800; text-decoration:none; }
 .landing-hero { position:relative; isolation:isolate; min-height:720px; display:grid; grid-template-columns:minmax(0,.88fr) minmax(520px,1.12fr); align-items:center; gap:clamp(44px,5vw,84px); padding:76px clamp(28px,7vw,118px) 86px; color:#fff; background:radial-gradient(circle at 16% 15%,#6958d842,transparent 31%),radial-gradient(circle at 93% 85%,#d49a3730,transparent 28%),linear-gradient(145deg,#11121d 0%,#1d1b33 54%,#12131e 100%); }
-.landing-hero::before { position:absolute; z-index:-1; inset:0; content:""; opacity:.38; background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px); background-size:72px 72px; mask-image:linear-gradient(90deg,#000,transparent 66%); }
+.landing-hero::before { position:absolute; z-index:-1; inset:0; content:""; opacity:.16; background:url("/stoics-full-members.webp") center center / cover no-repeat; pointer-events:none; }
 .landing-hero-copy { max-width:650px; }
 .landing-kicker { display:inline-flex; align-items:center; gap:8px; color:#d8b76d; font-size:10px; font-weight:900; letter-spacing:.18em; }
 .landing-hero h1 { margin:21px 0 24px; font:600 clamp(52px,5.8vw,88px)/.98 "Google Sans","Segoe UI",Arial,sans-serif; letter-spacing:-.045em; }

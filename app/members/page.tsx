@@ -19,7 +19,7 @@ export default function MembersPage() {
     <section className="public-inquiries-content featured-members-content">
       <div className="members-hero"><span className="members-hero-icon"><Sparkles size={26} /></span><div className="public-title"><span>STOICS GUILD</span><h1>Guild Members</h1><p>Meet the members who run, fight, and share every reward with Stoics.</p></div></div>
       <div className="featured-member-grid">
-        {membersPageMembers.map((member) => <article className="featured-member-card" key={member.name}>
+        {membersPageMembers.map((member) => <article className="featured-member-card" key={member.image}>
           <img src={member.image} alt={`${member.name}, ${member.role}`} />
           <div className="featured-member-card-shade" />
           <div className="featured-member-card-copy"><span>Guild member</span><h2>{member.name}</h2><p>{member.role}</p></div>

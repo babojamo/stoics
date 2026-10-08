@@ -34,7 +34,7 @@ export function FeaturedMembers({ variant = "login" }: { variant?: "login" | "pu
     <div className="character-caption"><span>Featured member</span><strong>{carouselMembers[active].name}</strong><small>{carouselMembers[active].role}</small></div>
     <div className="character-controls">
       <button type="button" onClick={(event) => { event.stopPropagation(); show(active - 1); }} aria-label="Previous character"><ChevronLeft size={18} /></button>
-      <div className="character-dots" aria-label="Choose featured character">{carouselMembers.map((member, index) => <button type="button" className={index === active ? "active" : ""} aria-label={`Show ${member.name}`} aria-current={index === active ? "true" : undefined} onClick={(event) => { event.stopPropagation(); show(index); }} key={member.name} />)}</div>
+      <div className="character-dots" aria-label="Choose featured character">{carouselMembers.map((member, index) => <button type="button" className={index === active ? "active" : ""} aria-label={`Show ${member.name}`} aria-current={index === active ? "true" : undefined} onClick={(event) => { event.stopPropagation(); show(index); }} key={member.image} />)}</div>
       <button type="button" onClick={(event) => { event.stopPropagation(); show(active + 1); }} aria-label="Next character"><ChevronRight size={18} /></button>
     </div>
   </div>;

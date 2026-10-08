@@ -22,4 +22,7 @@ export const featuredMembers = [
   { name: "risheeL", role: "Seraph", image: "/characters/risheel-seraph.webp" },
   { name: "KOB", role: "Templar", image: "/characters/kob-templar.webp" },
   { name: "Saira", role: "Crackshooter", image: "/characters/saira-crackshooter.webp" },
+  { name: "Hera44", role: "Seraph", image: "/characters/hera44-seraph.webp" },
+  { name: "Aula", role: "Arcanist", image: "/characters/aula-arcanist-alt.webp" },
+  { name: "Pokabelyas", role: "Seraph", image: "/characters/pokabelyas-seraph.webp" },
 ] as const;

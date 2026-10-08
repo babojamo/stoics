@@ -4,6 +4,7 @@ import type { LootState } from "../../../lib/types";
 import { getRuntimeEnv } from "../../../lib/runtime-env";
 import { normalizeVendingPrices } from "../../../lib/vending-prices";
 import { normalizeLootImages } from "../../../lib/loot-images";
+import { auditMessages, postDiscordAudit } from "../../../lib/discord-audit";
 
 const rowId = "guild";
 
@@ -71,6 +72,28 @@ export async function PUT(request: Request) {
   if (state.auditLog?.[0]) state.auditLog[0].username = username;
   const { url, key } = config();
   if (!url || !key) return Response.json({ error: "Supabase is not configured." }, { status: 503 });
+  const webhookUrl = getRuntimeEnv().STOICS_DISCORD_WEBHOOK_URL;
+  let previous: LootState | null = null;
+  if (webhookUrl) {
+    const snapshot = await fetch(`${url}/rest/v1/rpc/get_stoics_loot_state`, {
+      method: "POST", headers: supabaseHeaders(), body: "{}", cache: "no-store",
+    });
+    if (snapshot.ok) previous = normalizeState((await snapshot.json()) as LootState);
+    else if (await rpcIsMissing(snapshot)) previous = await readLegacyState(url);
+    if (!previous) return Response.json({ error: "Could not read the current ledger for Discord logging. No changes were saved." }, { status: 503 });
+  }
+  const savedResponse = async (legacy = false) => {
+    if (!webhookUrl || !previous) return Response.json({ ok: true, legacy });
+    const messages = auditMessages(previous, state, username);
+    if (!messages.length) return Response.json({ ok: true, legacy });
+    try {
+      await postDiscordAudit(webhookUrl, messages);
+      return Response.json({ ok: true, legacy });
+    } catch (error) {
+      console.error("Discord audit delivery failed:", error instanceof Error ? error.message : "Unknown error");
+      return Response.json({ ok: true, legacy, notificationWarning: "Saved to Supabase, but the Discord notification could not be delivered." });
+    }
+  };
   const response = await fetch(`${url}/rest/v1/rpc/save_stoics_loot_state`, {
     method: "POST",
     headers: supabaseHeaders(),
@@ -105,7 +128,7 @@ export async function PUT(request: Request) {
         if (!imagesPersisted) return Response.json({ error: "Loot photos need the included supabase-loot-images.sql before cloud saving." }, { status: 503 });
       }
     }
-    return Response.json({ ok: true });
+    return savedResponse();
   }
   const failure = await response.clone().json().catch(() => null) as { message?: string } | null;
   if (await rpcIsMissing(response)) {
@@ -114,7 +137,7 @@ export async function PUT(request: Request) {
       headers: { ...supabaseHeaders(), Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify({ id: rowId, payload: state, updated_at: new Date().toISOString() }),
     });
-    if (legacyResponse.ok) return Response.json({ ok: true, legacy: true });
+    if (legacyResponse.ok) return savedResponse(true);
   }
   const detail = failure?.message ? ` ${failure.message}` : "";
   return Response.json({ error: `Supabase save failed.${detail}` }, { status: 503 });

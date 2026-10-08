@@ -441,7 +441,13 @@ export default function Home() {
     setSaving(true);
     try {
       const response = await fetch("/api/state", { method: "PUT", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(stamped) });
-      if (response.ok) { setConnected(true); setFlash({ type: "good", text: "Saved to Supabase" }); }
+      if (response.ok) {
+        const result = await response.json().catch(() => null) as { notificationWarning?: string } | null;
+        setConnected(true);
+        setFlash(result?.notificationWarning
+          ? { type: "warn", text: result.notificationWarning }
+          : { type: "good", text: "Saved to Supabase" });
+      }
       else {
         const problem = await response.json().catch(() => null) as { error?: string } | null;
         setConnected(false); setFlash({ type: "warn", text: problem?.error ?? "Saved on this device while Supabase is unavailable." });

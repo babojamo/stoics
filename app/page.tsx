@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowRight, Coins, Gem, Search, ShieldCheck, Sparkles, Store, Users } from "lucide-react";
 import { FeaturedMembers } from "./components/featured-members";
+import { GuildCinematic } from "./components/guild-cinematic";
 
 export const metadata: Metadata = {
   title: "Stoics Guild | Flyff Universe Dungeon Community",
@@ -46,7 +47,7 @@ export default function LandingPage() {
 
     <section className="landing-cinematic" id="cinematic" aria-labelledby="landing-cinematic-title">
       <div className="landing-cinematic-intro"><span className="landing-section-kicker">THE STOICS STORY</span><h2 id="landing-cinematic-title">See the guild in motion.</h2><p>A cinematic look at the members who make every run memorable.</p></div>
-      <div className="landing-cinematic-frame"><video controls playsInline preload="none" poster="/stoics-guild-cinematic-poster.webp" aria-label="Stoics guild cinematic video"><source src="/stoics-guild-cinematic.mp4" type="video/mp4" />Your browser does not support HTML video.</video></div>
+      <div className="landing-cinematic-frame"><GuildCinematic /></div>
     </section>
 
     <section className="landing-about" id="about">

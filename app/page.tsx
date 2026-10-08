@@ -58,8 +58,8 @@ export default function LandingPage() {
       </div>
     </section>
 
-    <section className="landing-callout"><div><span>ENTER THE STOICS LEDGER</span><h2>See the guild in action.</h2><p>Meet the roster, check available loot, or look up member payouts.</p></div><div><a href="/members"><Users size={17} /> Featured members</a><a href="/shop"><Store size={17} /> Loot shop</a><a href="/inquiries"><Search size={17} /> Public inquiries</a></div></section>
+    <section className="landing-callout"><div><span>ENTER THE STOICS LEDGER</span><h2>See the guild in action.</h2><p>Meet the roster, check available loot, or look up member payouts.</p></div><div><a href="/members"><Users size={17} /> Guild Members</a><a href="/shop"><Store size={17} /> Loot shop</a><a href="/inquiries"><Search size={17} /> Public inquiries</a></div></section>
 
-    <footer className="landing-footer"><div className="landing-footer-brand"><img src="/stoics-logo.webp" alt="" /><div><strong>STOICS</strong><span>Run as one. Share every reward.</span></div></div><nav aria-label="Footer navigation"><a href="/">Home</a><a href="/members">Featured members</a><a href="/shop">Loot shop</a><a href="/inquiries">Public inquiries</a><a href="/login">Manager login</a></nav><p>Website created by <strong>Kevin Loquencio</strong></p></footer>
+    <footer className="landing-footer"><div className="landing-footer-brand"><img src="/stoics-logo.webp" alt="" /><div><strong>STOICS</strong><span>Run as one. Share every reward.</span></div></div><nav aria-label="Footer navigation"><a href="/">Home</a><a href="/members">Guild Members</a><a href="/shop">Loot shop</a><a href="/inquiries">Public inquiries</a><a href="/login">Manager login</a></nav><p>Website created by <strong>Kevin Loquencio</strong></p></footer>
   </main>;
 }

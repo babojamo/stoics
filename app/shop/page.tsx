@@ -52,10 +52,10 @@ export default function ShopPage() {
   return <main className="public-inquiries public-shop">
     <header className="public-inquiries-header">
       <button type="button" className="public-brand" onClick={() => window.location.assign("/")} aria-label="Open Stoics guild home"><span><img src="/stoics-logo.webp" alt="Stoics guild emblem" /></span><div><strong>STOICS</strong><small>LOOT SHOP</small></div></button>
-      <div className="public-header-actions"><button type="button" className="manager-link" onClick={() => window.location.assign("/members")}><Sparkles size={16} /> <span className="public-nav-label">Featured members</span></button><button type="button" className="manager-link" onClick={() => window.location.assign("/inquiries")}><Users size={16} /> <span className="public-nav-label">Member inquiries</span></button><button type="button" className="manager-link" onClick={() => window.location.assign("/login")}><ShieldCheck size={16} /> <span className="public-nav-label">Manager login</span></button></div>
+      <div className="public-header-actions"><button type="button" className="manager-link" onClick={() => window.location.assign("/members")}><Sparkles size={16} /> <span className="public-nav-label">Guild Members</span></button><button type="button" className="manager-link" onClick={() => window.location.assign("/inquiries")}><Users size={16} /> <span className="public-nav-label">Member inquiries</span></button><button type="button" className="manager-link" onClick={() => window.location.assign("/login")}><ShieldCheck size={16} /> <span className="public-nav-label">Manager login</span></button></div>
     </header>
     <section className="public-inquiries-content">
-      <section className="public-carousel-hero shop-carousel-hero" aria-label="Stoics public shop and featured members">
+      <section className="public-carousel-hero shop-carousel-hero" aria-label="Stoics public shop and guild members">
         <FeaturedMembers variant="public" />
         <div className="public-carousel-hero-content">
           <div className="shop-hero"><div className="shop-hero-icon"><Store size={26} /></div><div className="public-title"><span>STOICS PUBLIC SHOP</span><h1>Dungeon loot & vending prices</h1><p>Browse available Stoics loot and check the latest vending price for every item.</p></div></div>

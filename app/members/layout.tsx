@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 
 const publicOrigin = "https://stoics-loots.lokwensio.com";
 const membersUrl = `${publicOrigin}/members`;
-const title = "Featured Stoics Members | Flyff Universe Guild";
-const description = "Meet the featured members of Stoics, a Flyff Universe guild that tracks dungeon loot, fair party payouts, and vending prices.";
+const title = "Guild Members";
+const description = "Meet the guild members of Stoics, a Flyff Universe guild that tracks dungeon loot, fair party payouts, and vending prices.";
 
 export const metadata: Metadata = {
   title,
   description,
-  keywords: ["Stoics guild members", "Flyff Universe guild", "featured members", "Flyff dungeon guild"],
+  keywords: ["Stoics guild members", "Flyff Universe guild", "guild members", "Flyff dungeon guild"],
   alternates: { canonical: membersUrl },
   robots: { index: true, follow: true },
   openGraph: {

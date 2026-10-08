@@ -11,4 +11,7 @@ export const featuredMembers = [
   { name: "xNeo", role: "Forcemaster", image: "/characters/xneo-forcemaster.png" },
   { name: "PushSea", role: "Harlequin", image: "/characters/pushsea-harlequin.png" },
   { name: "NELEN", role: "Slayer", image: "/characters/nelen-slayer.png" },
+  { name: "Jazaniah", role: "Jester", image: "/characters/jazaniah-jester.png" },
+  { name: "lordberus", role: "Forcemaster", image: "/characters/lordberus-forcemaster.png" },
+  { name: "K I D P L A Y", role: "Crackshooter", image: "/characters/kidplay-crackshooter.png" },
 ] as const;

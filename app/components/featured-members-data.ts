@@ -25,4 +25,8 @@ export const featuredMembers = [
   { name: "Hera44", role: "Seraph", image: "/characters/hera44-seraph.webp" },
   { name: "Aula", role: "Arcanist", image: "/characters/aula-arcanist-alt.webp" },
   { name: "Pokabelyas", role: "Seraph", image: "/characters/pokabelyas-seraph.webp" },
+  { name: "K I D P L A Y", role: "Crackshooter", image: "/characters/kidplay-crackshooter-alt.webp" },
+  { name: "Joy", role: "Ring Master", image: "/characters/joy-ring-master.webp" },
+  { name: "Melisandrea", role: "Mentalist", image: "/characters/melisandrea-mentalist.webp" },
+  { name: "SMASHIE", role: "Seraph", image: "/characters/smashie-seraph.webp" },
 ] as const;

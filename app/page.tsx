@@ -44,6 +44,11 @@ export default function LandingPage() {
       <div className="landing-carousel-wrap"><FeaturedMembers variant="public" /></div>
     </section>
 
+    <section className="landing-cinematic" id="cinematic" aria-labelledby="landing-cinematic-title">
+      <div className="landing-cinematic-intro"><span className="landing-section-kicker">THE STOICS STORY</span><h2 id="landing-cinematic-title">See the guild in motion.</h2><p>A cinematic look at the members who make every run memorable.</p></div>
+      <div className="landing-cinematic-frame"><video controls playsInline preload="none" poster="/stoics-guild-cinematic-poster.webp" aria-label="Stoics guild cinematic video"><source src="/stoics-guild-cinematic.mp4" type="video/mp4" />Your browser does not support HTML video.</video></div>
+    </section>
+
     <section className="landing-about" id="about">
       <div className="landing-emblem"><span><img src="/stoics-logo.webp" alt="Stoics guild logo" /></span><i /><i /><i /></div>
       <div className="landing-about-copy"><span className="landing-section-kicker">ABOUT THE GUILD</span><h2>Strong parties are built on trust.</h2><p>Stoics brings players together for organized dungeon runs, shared progression, and fair distribution of every valuable drop. Our public ledger makes loot, vending prices, sales, and member payouts easy to follow.</p><p>Every run adds to the guild story. Every member helps write it.</p><a href="/inquiries">Explore the public ledger <ArrowRight size={16} /></a></div>

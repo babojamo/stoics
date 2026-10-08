@@ -9,4 +9,6 @@ export const featuredMembers = [
   { name: "Raseeeel", role: "The Great Vendor", image: "/characters/raseeeel-the-great-vendor.webp" },
   { name: "Gwingarcia", role: "Guild Leader - Seraph", image: "/characters/gwingarcia-seraph.webp" },
   { name: "xNeo", role: "Forcemaster", image: "/characters/xneo-forcemaster.png" },
+  { name: "PushSea", role: "Harlequin", image: "/characters/pushsea-harlequin.png" },
+  { name: "NELEN", role: "Slayer", image: "/characters/nelen-slayer.png" },
 ] as const;

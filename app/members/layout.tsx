@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 
-const publicOrigin = "https://stoics-loots.lokwensio.com";
+const publicOrigin = "https://stoics.lokwensio.com";
 const membersUrl = `${publicOrigin}/members`;
 const title = "Guild Members";
-const description = "Meet the guild members of Stoics, a Flyff Universe guild that tracks dungeon loot, fair party payouts, and vending prices.";
+const description = "Meet the members who run, fight, and share every reward with Stoics.";
+const previewImage = `${membersUrl}/opengraph-image.png`;
 
 export const metadata: Metadata = {
   title,
@@ -18,9 +19,9 @@ export const metadata: Metadata = {
     siteName: "Stoics Loot Ledger",
     title,
     description,
-    images: [{ url: `${publicOrigin}/stoics-logo.webp`, width: 1024, height: 1024, alt: "Stoics guild emblem" }],
+    images: [{ url: previewImage, width: 1672, height: 941, alt: "Stoics guild members gathered around the guild crest" }],
   },
-  twitter: { card: "summary_large_image", title, description, images: [`${publicOrigin}/stoics-logo.webp`] },
+  twitter: { card: "summary_large_image", title, description, images: [previewImage] },
 };
 
 const structuredData = {

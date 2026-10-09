@@ -32,6 +32,7 @@ import { defaultState } from "../../lib/default-state";
 import type { DungeonRun, LootState, Member, RunLoot, Sale } from "../../lib/types";
 import { normalizeVendingPrices, setVendingPrice } from "../../lib/vending-prices";
 import { lootImageFor, normalizeLootImages, setLootImage } from "../../lib/loot-images";
+import { resolveRunParty } from "../../lib/run-party";
 import { PenyaAmount, PenyaCoin } from "./penya";
 import { FeaturedMembers } from "./featured-members";
 
@@ -841,25 +842,16 @@ function RunModal({ state, run, currentUser, onClose, onSave }: { state: LootSta
     const cleanLoots = loots.filter((loot) => loot.name.trim() && loot.quantity > 0);
     const selectedDate = new Date(createdAt);
     if (!dungeon.trim() || !selected.length || !cleanLoots.length || Number.isNaN(selectedDate.getTime())) return;
-    const resolvedParty = members
-      .filter((member) => selected.includes(member.id) && member.name.trim())
-      .map((member) => {
-        const name = member.name.trim();
-        const existing = state.members.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
-        return existing && existing.id !== member.id ? existing : { ...member, name };
-      });
-    const uniqueParty = [...new Map(resolvedParty.map((member) => [member.id, member])).values()];
-    if (!uniqueParty.length) return;
-    const partyById = new Map(uniqueParty.map((member) => [member.id, member]));
-    const mergedMembers = [
-      ...state.members.map((member) => partyById.get(member.id) ?? member),
-      ...uniqueParty.filter((member) => !state.members.some((existing) => existing.id === member.id)),
-    ];
+    const resolvedParty = resolveRunParty(members, selected, state.members, makeId);
+    if (!resolvedParty.memberIds.length) return;
+    const savedDate = run && createdAt === toDateTimeLocalValue(new Date(run.createdAt))
+      ? run.createdAt
+      : selectedDate.toISOString();
     const savedRun: DungeonRun = run
-      ? { ...run, dungeon: dungeon.trim(), createdAt: selectedDate.toISOString(), memberIds: uniqueParty.map((member) => member.id), loots: cleanLoots }
-      : { id: makeId(), dungeon: dungeon.trim(), createdAt: selectedDate.toISOString(), memberIds: uniqueParty.map((member) => member.id), loots: cleanLoots, createdBy: currentUser };
+      ? { ...run, dungeon: dungeon.trim(), createdAt: savedDate, memberIds: resolvedParty.memberIds, loots: cleanLoots }
+      : { id: makeId(), dungeon: dungeon.trim(), createdAt: savedDate, memberIds: resolvedParty.memberIds, loots: cleanLoots, createdBy: currentUser };
     const runs = run ? state.runs.map((candidate) => candidate.id === run.id ? savedRun : candidate) : [savedRun, ...state.runs];
-    const nextState = { ...state, members: mergedMembers, runs };
+    const nextState = { ...state, members: resolvedParty.members, runs };
     onSave({ ...nextState, payoutQueue: currentPayoutQueue(nextState) });
   };
 
